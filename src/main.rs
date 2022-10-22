@@ -1,2 +1,4 @@
+mod bloomfilter;
+
 fn main() {
 }
