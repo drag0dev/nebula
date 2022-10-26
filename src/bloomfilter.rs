@@ -24,7 +24,7 @@ pub struct BloomFilter{
 
 impl BloomFilter{
     /// function will panic if number of hash functions and number of seeds does not match
-    pub fn new(item_count: u64, fp_prob: f64) -> (Self, Option<Vec<u32>>){
+    pub fn new(item_count: u64, fp_prob: f64) -> Self{
         // size = -(items * log(probability)) / (log(2)^2)
         let bit_arr_len = -((item_count as f64 * fp_prob.log(EULER_NUMBER)) /
                             (2_f64.log(EULER_NUMBER).powi(2) as f64))
@@ -60,7 +60,7 @@ impl BloomFilter{
             bit_arr.push(false);
         }
 
-        (BloomFilter {
+        BloomFilter {
             pow,
             hash_functions,
             bit_arr,
@@ -68,7 +68,7 @@ impl BloomFilter{
             seeds: seeds.clone(),
             fp_prob,
             item_count,
-        }, Some(seeds))
+        }
     }
 
     pub fn add(&mut self, item: &str) -> Result<()>{
@@ -158,7 +158,7 @@ mod tests{
 
     #[test]
     fn present_value(){
-        let (mut bf, _) = BloomFilter::new(100_000, 0.02);
+        let mut bf = BloomFilter::new(100_000, 0.02);
 
         assert_eq!(bf.add("temp").unwrap(), ());
         assert_eq!(bf.check("temp").unwrap(), true);
