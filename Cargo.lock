@@ -44,7 +44,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "letranger"
+name = "hermaeus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
