@@ -3,7 +3,7 @@ use bitvec::prelude::BitVec;
 use murmur3::murmur3_x64_128;
 use anyhow::{Result, Context};
 use rand::Rng;
-use std::io::prelude::*;
+use crate::utils::*;
 
 #[allow(dead_code)]
 const EULER_NUMBER: f64 = 2.71828;
@@ -34,7 +34,7 @@ impl BloomFilter{
         // hash functions = (size/item_count) * log(2)
         let hash_functions = ((bit_arr_len as f64 /item_count as f64) * 2_f64.log(EULER_NUMBER))
                             .round() as u64;
-        let seeds = match load_seeds(){
+        let seeds = match load_seeds("bf-seeds.txt"){
             Some(seeds) => {
                 if hash_functions != seeds.len() as u64{
                     panic!("Number of hash functions has to match number of seeds!");
@@ -48,7 +48,7 @@ impl BloomFilter{
                 for _ in 0..hash_functions{
                     seeds.push(rng.gen());
                 }
-                write_seeds(&seeds);
+                write_seeds(&seeds, "bf-seeds.txt");
                 seeds
             }
         };
@@ -75,7 +75,7 @@ impl BloomFilter{
         for seed in self.seeds.iter(){
             let hash_result = murmur3_x64_128(&mut Cursor::new(item), *seed)
                 .context("error hashing an item")?;
-            self.bit_arr.set(modulo(hash_result, self.pow, self.bit_arr_len), true);
+            self.bit_arr.set(modulo(hash_result, self.bit_arr_len as u128), true);
         }
         Ok(())
     }
@@ -84,71 +84,11 @@ impl BloomFilter{
         for seed in self.seeds.iter(){
             let hash_result = murmur3_x64_128(&mut Cursor::new(item), *seed)
                 .context("error hashing an item")?;
-            let bit = self.bit_arr.get(modulo(hash_result, self.pow , self.bit_arr_len))
+            let bit = self.bit_arr.get(modulo(hash_result, self.bit_arr_len as u128))
                 .context("error getting bit")?;
             if !bit{
                 return Ok(false);
             } } Ok(true)
-    }
-}
-
-/// finding modulo using right shift
-/// only works if the divisor is a power of 2
-fn modulo(hash: u128, pow: u32, divisor: u64) -> usize{
-    let mut res = hash;
-    while res >= divisor as u128{
-        // res = res % divisor
-        res = res >> pow;
-    }
-    res as usize
-}
-
-/// find the closest power of 2 that is >= bit_arr_len
-/// expected number of items should be considered carefully especially if memory usage is important
-fn closest_pow(n: u64) -> (u64, u32){
-    let mut res: u64 = 2;
-    let mut pow: u32 = 1;
-    while res < n{
-        res = res << 1;
-        pow += 1;
-    }
-    (res, pow)
-}
-
-fn load_seeds() -> Option<Vec<u32>>{
-    let file_contents = std::fs::read_to_string("seeds.txt");
-    if file_contents.is_err(){
-        return None
-    }else{
-        let file_contents = file_contents.unwrap();
-        let file_contents = file_contents.trim();
-        let mut seeds: Vec<u32> = Vec::with_capacity(file_contents.matches("\n").count());
-
-        for seed in file_contents.split("\n"){
-            let seed = seed.parse::<u32>();
-            if seed.is_err(){
-                panic!("error: parsing a seed \"{:?}\"", seed.err());
-            }else{
-                seeds.push(seed.unwrap());
-            }
-        }
-        return Some(seeds);
-    }
-}
-
-fn write_seeds(seeds: &Vec<u32>){
-    let file = std::fs::File::create("seeds.txt");
-    if file.is_err(){
-        panic!("error: creating \"seeds.txt\" file: \"{:?}\"", file.err());
-    }
-    let mut file = file.unwrap();
-    for s in seeds.iter(){
-        match file.write_all(format!("{}\n", s).as_bytes()){
-            Ok(_) => {},
-            Err(e) => {
-                panic!("error: writing a seed \"{}\"", e);
-            }
-        };
     }
 }
 
@@ -166,12 +106,5 @@ mod tests{
         assert_eq!(bf.check("temp1").unwrap(), false);
         assert_eq!(bf.add("temp1").unwrap(), ());
         assert_eq!(bf.check("temp1").unwrap(), true);
-    }
-
-    #[test]
-    // test will fail if its not ran with flag --test-threads=1 because the previous test interferes with this one
-    fn read_and_write_seeds(){
-        write_seeds(&vec![1, 2, 3]);
-        assert_eq!(load_seeds(), Some(vec![1, 2, 3]));
     }
 }
