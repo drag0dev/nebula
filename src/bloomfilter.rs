@@ -77,7 +77,7 @@ impl BloomFilter{
     pub fn check(&self, item: &str) -> Result<bool>{
         for seed in self.seeds.iter(){
             let hash_result = murmur3_x64_128(&mut Cursor::new(item), *seed)
-                .context("error hashing item")?;
+                .context("error hashing an item")?;
             let bit = self.bit_arr.get(modulo(hash_result, self.bit_arr_len as u128))
                 .context("error getting bit")?;
             if !bit{
