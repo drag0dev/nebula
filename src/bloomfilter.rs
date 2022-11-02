@@ -5,17 +5,12 @@ use anyhow::{Result, Context};
 use rand::Rng;
 use crate::utils::*;
 
-#[allow(dead_code)]
-const EULER_NUMBER: f64 = 2.71828;
-
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct BloomFilter{
     item_count: u64,
     /// false positive probability
     fp_prob: f64,
-    /// divisor is 2^pow
-    pow: u32,
     hash_functions: u64,
     bit_arr: BitVec,
     bit_arr_len: u64,
@@ -29,7 +24,7 @@ impl BloomFilter{
         let bit_arr_len = -((item_count as f64 * fp_prob.log(EULER_NUMBER)) /
                             (2_f64.log(EULER_NUMBER).powi(2) as f64))
                             .round() as u64;
-        let (bit_arr_len, pow) = closest_pow(bit_arr_len);
+        let bit_arr_len = closest_pow(bit_arr_len);
 
         // hash functions = (size/item_count) * log(2)
         let hash_functions = ((bit_arr_len as f64 /item_count as f64) * 2_f64.log(EULER_NUMBER))
@@ -61,11 +56,10 @@ impl BloomFilter{
         }
 
         BloomFilter {
-            pow,
             hash_functions,
             bit_arr,
             bit_arr_len,
-            seeds: seeds.clone(),
+            seeds,
             fp_prob,
             item_count,
         }
