@@ -10,14 +10,12 @@ pub fn modulo(num: u128, divisor: u128) -> usize {
 
 /// find the closest power of 2 that is >= bit_arr_len
 /// expected number of items should be considered carefully especially if memory usage is important
-pub fn closest_pow(n: u64) -> (u64, u32){
+pub fn closest_pow(n: u64) -> u64{
     let mut res: u64 = 2;
-    let mut pow: u32 = 1;
     while res < n{
         res = res << 1;
-        pow += 1;
     }
-    (res, pow)
+    res
 }
 
 
@@ -72,16 +70,16 @@ mod tests{
     }
     #[test]
     fn closest_pow_test(){
-        assert_eq!(closest_pow(7), (8, 3));
-        assert_eq!(closest_pow(2), (2, 1));
-        assert_eq!(closest_pow(120), (128, 7));
-        assert_eq!(closest_pow(240), (256, 8));
+        assert_eq!(closest_pow(7), 8);
+        assert_eq!(closest_pow(2), 2);
+        assert_eq!(closest_pow(120), 128);
+        assert_eq!(closest_pow(240), 256);
     }
     #[test]
     fn writing_and_reading_seeds(){
-        write_seeds(&vec![1, 2, 3], "seeds.txt");
-        assert_eq!(load_seeds("seeds.txt").unwrap(), vec![1, 2, 3]);
-        write_seeds(&vec![111, 222, 333], "seeds.txt");
-        assert_eq!(load_seeds("seeds.txt").unwrap(), vec![111, 222, 333]);
+        write_seeds(&vec![1, 2, 3], "bf-seeds.txt");
+        assert_eq!(load_seeds("bf-seeds.txt").unwrap(), vec![1, 2, 3]);
+        write_seeds(&vec![111, 222, 333], "bf-seeds.txt");
+        assert_eq!(load_seeds("bf-seeds.txt").unwrap(), vec![111, 222, 333]);
     }
 }
