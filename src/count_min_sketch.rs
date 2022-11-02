@@ -33,11 +33,11 @@ pub struct CountMinSketch {
 #[allow(dead_code)]
 impl CountMinSketch {
     pub fn new(desired_accuracy: f64, certainty: f64) -> CountMinSketch {
-        // k = ln(1/eps)
-
+        // rows = ln(1/eps)
         let hash_func_count = (1_f64 / certainty).log(EULER_NUMBER).ceil() as u64;
 
         let column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
+        println!("bruh: {}", column_count);
 
         let (column_count, pow) = closest_pow(column_count);
 
@@ -68,6 +68,9 @@ impl CountMinSketch {
         // matrix of 0s
         let matrix = vec![vec![0; w]; h];
 
+        println!("\n\ncolumns: {}", column_count);
+        println!("rows: {}", hash_func_count);
+
         CountMinSketch {
             pow,
             hash_func_count,
@@ -79,6 +82,9 @@ impl CountMinSketch {
         }
     }
 
+    /// compute a hash value for each row in the matrix,
+    /// and increment the cell at index hash % column_count,
+    /// for every row respectively
     pub fn add(&mut self, item: &str) -> Result<()> {
         // current hash function index
         let mut hash_index = 0;
@@ -98,6 +104,9 @@ impl CountMinSketch {
         Ok(())
     }
 
+    /// compute a hash value for each row in the matrix
+    /// and track the values at index hash % column_count,
+    /// for every row respectively, then return the minimum of those values
     pub fn count(&self, item: &str) -> Result<u64> {
         // current hash function index
         let mut hash_index = 0;
@@ -194,39 +203,27 @@ mod tests {
     #[test]
     fn count_foo() {
         let mut cms = CountMinSketch::new(0.1, 0.1);
-        // println!();
-        // println!();
-        // println!("columns: {}", cms.column_count);
-        // println!("rows: {}", cms.hash_func_count);
 
         let testarr = ["foo", "foo", "foo", "foo", "bar"];
-        println!("{:?}", testarr);
         for word in testarr {
             match cms.add(word) {
                 Ok(()) => {}
                 Err(e) => panic!("error: failed adding word to CountMinSketch \"{}\"", e),
             }
-
-            // println!("\nmatrix:");
-            // for row in &cms.matrix {
-            //     println!("{:?}", row);
-            // }
         }
 
         match cms.count("foo") {
             Ok(val) => {
-                println!("\ncounted {} foos\n", val);
                 assert_eq!(val >= 4, true);
             }
-            Err(e) => panic!("error: cms didn't count correctly \"{}\"", e),
+            Err(e) => panic!("error: cms counting broke \"{}\"", e),
         }
     }
 
     #[test]
     fn count_bar() {
-        let mut cms = CountMinSketch::new(0.01, 0.01);
+        let mut cms = CountMinSketch::new(0.1, 0.1);
         let testarr = ["foo", "foo", "foo", "bar", "foo", "foo", "foo", "bar"];
-        println!("{:?}", testarr);
 
         for word in testarr {
             match cms.add(word) {
@@ -237,10 +234,87 @@ mod tests {
 
         match cms.count("foo") {
             Ok(val) => {
-                println!("\ncounted {} bars\n", val);
                 assert_eq!(val >= 2, true);
             }
-            Err(e) => panic!("error: cms didn't count correctly \"{}\"", e),
+            Err(e) => panic!("error: cms counting broke \"{}\"", e),
+        }
+    }
+
+    #[test]
+    fn empty_cms() {
+        let mut cms = CountMinSketch::new(0.1, 0.1);
+
+        let testarr = [];
+
+        for word in testarr {
+            match cms.add(word) {
+                Ok(()) => {}
+                Err(e) => panic!("error: failed adding word to CountMinSketch \"{}\"", e),
+            }
+        }
+
+        match cms.count("foo") {
+            Ok(val) => {
+                assert_eq!(val > 0, false);
+            }
+            Err(e) => panic!("error: cms counting broke\"{}\"", e),
+        }
+    }
+
+    #[test]
+    fn not_contained() {
+        let mut cms = CountMinSketch::new(0.1, 0.1);
+
+        // no bigfoot
+        let testarr = [
+            "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree",
+            "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree", "tree",
+        ];
+
+        for word in testarr {
+            match cms.add(word) {
+                Ok(()) => {}
+                Err(e) => panic!("error: failed adding word to CountMinSketch \"{}\"", e),
+            }
+        }
+
+        match cms.count("bigfoot") {
+            Ok(val) => {
+                assert_eq!(val > 0, false);
+            }
+            Err(e) => panic!("error: cms counting broke\"{}\"", e),
+        }
+    }
+
+    #[test]
+    fn find_egg() {
+        let mut cms = CountMinSketch::new(0.1, 0.1);
+
+        // 100 hams, 1 egg
+        let testarr = [
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham", "ham",
+            "ham", "ham", "ham", "ham", "egg",
+        ];
+
+        for word in testarr {
+            match cms.add(word) {
+                Ok(()) => {}
+                Err(e) => panic!("error: failed adding word to CountMinSketch \"{}\"", e),
+            }
+        }
+
+        match cms.count("egg") {
+            Ok(val) => {
+                assert_eq!(val >= 1, true);
+            }
+            Err(e) => panic!("error: cms counting broke \"{}\"", e),
         }
     }
 }
