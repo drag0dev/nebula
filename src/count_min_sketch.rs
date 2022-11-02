@@ -1,9 +1,8 @@
-use std::io::Cursor;
-
 use crate::utils::*;
 use anyhow::{Context, Result};
 use murmur3::murmur3_x64_128;
 use rand::Rng;
+use std::io::Cursor;
 
 #[allow(dead_code)]
 const EULER_NUMBER: f64 = 2.71828;
@@ -11,9 +10,6 @@ const EULER_NUMBER: f64 = 2.71828;
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct CountMinSketch {
-    /// divisor is 2^pow
-    pow: u32,
-
     /// the hash functions should be "pair-wise independent" (?)
     hash_func_count: u64,
     column_count: u64,
@@ -37,7 +33,7 @@ impl CountMinSketch {
         let hash_func_count = (1_f64 / certainty).log(EULER_NUMBER).ceil() as u64;
 
         let column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
-        let (column_count, pow) = closest_pow(column_count);
+        let (column_count, _) = closest_pow(column_count);
         println!("columns: {}", column_count);
         println!("rows: {}", hash_func_count);
 
@@ -74,7 +70,6 @@ impl CountMinSketch {
         println!("rows: {}", hash_func_count);
 
         CountMinSketch {
-            pow,
             hash_func_count,
             column_count,
             desired_accuracy,
