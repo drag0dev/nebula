@@ -28,15 +28,14 @@ impl CountMinSketch {
         // rows = ln(1/eps)
         let hash_func_count = (1_f64 / certainty).log(EULER_NUMBER).ceil() as u64;
 
-        let column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
+        let mut column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
         column_count = closest_pow(column_count);
-        println!("columns: {}", column_count);
-        println!("rows: {}", hash_func_count);
 
         let seeds = match load_seeds("cms-seeds.txt") {
             Some(seeds) => {
                 if hash_func_count != seeds.len() as u64 {
                     println!("seeds: {}", seeds.len());
+                    println!("hash funcs: {}", hash_func_count);
 
                     panic!("Number of hash functions has to match number of seeds!");
                 }
@@ -61,9 +60,6 @@ impl CountMinSketch {
 
         // matrix of 0s
         let matrix = vec![vec![0; w]; h];
-
-        println!("\n\ncolumns: {}", column_count);
-        println!("rows: {}", hash_func_count);
 
         CountMinSketch {
             hash_func_count,
