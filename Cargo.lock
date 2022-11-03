@@ -44,16 +44,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hermaeus"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitvec",
- "murmur3",
- "rand",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.135"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -64,6 +54,16 @@ name = "murmur3"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9252111cf132ba0929b6f8e030cac2a24b507f3a4d6db6fb2896f27b354c714b"
+
+[[package]]
+name = "nebula"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitvec",
+ "murmur3",
+ "rand",
+]
 
 [[package]]
 name = "ppv-lite86"
