@@ -4,9 +4,6 @@ use murmur3::murmur3_x64_128;
 use rand::Rng;
 use std::io::Cursor;
 
-#[allow(dead_code)]
-const EULER_NUMBER: f64 = 2.71828;
-
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct CountMinSketch {
@@ -26,14 +23,13 @@ pub struct CountMinSketch {
     matrix: Vec<Vec<u64>>,
 }
 
-#[allow(dead_code)]
 impl CountMinSketch {
     pub fn new(desired_accuracy: f64, certainty: f64) -> CountMinSketch {
         // rows = ln(1/eps)
         let hash_func_count = (1_f64 / certainty).log(EULER_NUMBER).ceil() as u64;
 
         let column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
-        let (column_count, _) = closest_pow(column_count);
+        column_count = closest_pow(column_count);
         println!("columns: {}", column_count);
         println!("rows: {}", hash_func_count);
 
@@ -74,7 +70,7 @@ impl CountMinSketch {
             column_count,
             desired_accuracy,
             certainty,
-            seeds: seeds.clone(),
+            seeds,
             matrix,
         }
     }
