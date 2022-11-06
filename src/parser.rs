@@ -225,6 +225,48 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
     }
 }
 
+/// get vec of slices of all tokens in the provided String
+fn get_tokens<'a>(input: &'a str) -> Vec<&'a str>{
+    let mut tokens = Vec::new();
+    let mut start = 0;
+    let mut end;
+    let mut iter = input.chars().peekable();
+
+    let mut next_char: Option<&char>;
+    'outer: loop{
+        // get to the start of a word
+        next_char = iter.peek();
+        if next_char.is_none(){ // if we there is no more chars break
+            break 'outer;
+        }else if !next_char.unwrap().is_ascii_graphic(){
+            loop{ // get to the first printable char
+                iter.next();
+                start += 1;
+                if let Some(c) = iter.by_ref().peek(){ // if next char
+                    if c.is_ascii_graphic(){
+                        break;
+                    }
+                }else{
+                    break 'outer; // if no printable char was find, break
+                }
+            }
+        }
+
+        // get to the end of a word
+        end = start;
+        for c in iter.by_ref(){
+            if !c.is_ascii_graphic(){
+                break;
+            }
+            end += 1;
+        }
+
+        tokens.push(&input[start..end]);
+        start = end+1; // step over the non graphic char
+    }
+    tokens
+}
+
 fn help_print(){
     println!("----------HELP----------");
     println!("GET key");
@@ -279,5 +321,16 @@ mod tests{
         assert_eq!(None, command_type("gett"));
         assert_eq!(None, command_type("1get"));
         assert_eq!(None, command_type("RANGE SCAN"));
+    }
+
+    #[test]
+    fn tokens(){
+        assert_eq!(get_tokens(" aa aa aa"), vec!["aa", "aa", "aa"]);
+        assert_eq!(get_tokens("aaaaaa"), vec!["aaaaaa"]);
+        assert_eq!(get_tokens("").len(), 0);
+        assert_eq!(get_tokens("   aa    aa aa    "), vec!["aa", "aa", "aa"]);
+        assert_eq!(get_tokens("   aa \n\t\t\t\0                           a aa "), vec!["aa", "a", "aa"]);
+        assert_eq!(get_tokens("aa\taa\naa\0aa"), vec!["aa", "aa", "aa", "aa"]);
+
     }
 }
