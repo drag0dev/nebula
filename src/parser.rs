@@ -282,6 +282,7 @@ fn help_print(){
 #[cfg(test)]
 mod tests{
     use super::*;
+
     #[test]
     fn uppercase_cmd_type(){
         assert_eq!(Some(CommandType::GET), command_type("GET"));
@@ -291,21 +292,8 @@ mod tests{
         assert_eq!(Some(CommandType::RANGE_SCAN), command_type("RANGESCAN"));
         assert_eq!(Some(CommandType::QUIT), command_type("QUIT"));
         assert_eq!(Some(CommandType::HELP), command_type("HELP"));
-    }
 
-    #[test]
-    fn lowercase_cmd_type(){
-        assert_eq!(Some(CommandType::GET), command_type("get"));
-        assert_eq!(Some(CommandType::PUT), command_type("put"));
-        assert_eq!(Some(CommandType::DELETE), command_type("delete"));
-        assert_eq!(Some(CommandType::LIST), command_type("list"));
-        assert_eq!(Some(CommandType::RANGE_SCAN), command_type("rangescan"));
-        assert_eq!(Some(CommandType::QUIT), command_type("quit"));
-        assert_eq!(Some(CommandType::HELP), command_type("help"));
-    }
-
-    #[test]
-    fn mixed_case_cmd_type(){
+        // mixed case
         assert_eq!(Some(CommandType::GET), command_type("gEt"));
         assert_eq!(Some(CommandType::PUT), command_type("PuT"));
         assert_eq!(Some(CommandType::DELETE), command_type("deLETe"));
@@ -313,10 +301,8 @@ mod tests{
         assert_eq!(Some(CommandType::RANGE_SCAN), command_type("RANGEscan"));
         assert_eq!(Some(CommandType::QUIT), command_type("qUIT"));
         assert_eq!(Some(CommandType::HELP), command_type("heLP"));
-    }
 
-    #[test]
-    fn wrong_cmd_type(){
+        // wrong cmd
         assert_eq!(None, command_type("123"));
         assert_eq!(None, command_type("gett"));
         assert_eq!(None, command_type("1get"));
