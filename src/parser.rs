@@ -3,7 +3,6 @@ use std::io::prelude::*;
 use std::io::{stdin, stdout};
 
 // TODO: add commands that would rely on Bloom Filter, SimHash, HLL and CMS
-// TODO: ignore extra spacing between words in user input
 // TODO: what can value be/what checks are supposed to be done
 // TODO: error on extra words in command
 // TODO: todo macros all are going to be replaced with actual calls to the write/read path
@@ -37,7 +36,16 @@ pub fn cli() -> Result<()>{
             continue;
         }
 
-        let cmd_type = command_type(trimmed_input);
+        let tokens = get_tokens(trimmed_input);
+
+        let cmd = tokens.get(0);
+        if cmd.is_none(){
+            println!("error: missing command");
+            println!("usage: command [...] (see HELP)");
+            continue;
+        }
+
+        let cmd_type = command_type(cmd.unwrap());
         if cmd_type == None{
             println!("error: invalid command");
             println!("usage: command [...] (see HELP)");
@@ -48,7 +56,7 @@ pub fn cli() -> Result<()>{
             help_print();
         }else{
             let cmd_type = cmd_type.unwrap();
-            if execute_command(trimmed_input, cmd_type).is_err(){
+            if execute_command(&tokens, cmd_type).is_err(){
                 return Ok(());
             }
         }
@@ -78,10 +86,10 @@ fn command_type(input: &str) -> Option<CommandType>{
 
 /// returns error only when there was error executing command in write/read path
 /// where the error handling is done, here used as an indicator to stop user input
-fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
+fn execute_command(tokens: &Vec<&str>, cmd_type: CommandType) -> Result<(), ()>{
     match cmd_type{
         CommandType::GET => {
-            let key = input.split(" ").nth(1);
+            let key = tokens.get(1);
             if let Some(key) = key{
                 if !key.chars().all(|c| c.is_ascii_graphic()){
                     println!("error: key must only contain printable ascii characters");
@@ -96,7 +104,7 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
         },
 
         CommandType::PUT => {
-            let key = input.split(" ").nth(1);
+            let key = tokens.get(1);
             if let Some(key) = key{
                 if !key.chars().all(|c| c.is_ascii_graphic()){
                     println!("error: key must only contain printable ascii characters");
@@ -109,7 +117,7 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
             }
             let key = key.unwrap();
 
-            let value = input.split(" ").nth(2);
+            let value = tokens.get(2);
             if let Some(value) = value{
             }else{
                 println!("error: missing value");
@@ -121,7 +129,7 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
         },
 
         CommandType::DELETE => {
-            let key = input.split(" ").nth(1);
+            let key = tokens.get(1);
             if let Some(key) = key{
                 if !key.chars().all(|c| c.is_ascii_graphic()){
                     println!("error: key must only contain printable ascii characters");
@@ -135,15 +143,15 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
             }
         },
         CommandType::LIST => {
-            let prefix = input.split(" ").nth(1);
+            let prefix = tokens.get(1);
             if let Some(prefix) = prefix{
                 if !prefix.chars().all(|c| c.is_ascii_graphic()){
                     println!("error: prefix must only contain printable ascii characters");
                     return Ok(());
                 }
                 // check for pagination
-                let page_size = input.split(" ").nth(2);
-                let page_number = input.split(" ").nth(3);
+                let page_size = tokens.get(2);
+                let page_number = tokens.get(3);
 
                 if page_size.is_some() && page_number.is_some(){ // pagination
                     let page_size = page_size.unwrap();
@@ -171,7 +179,7 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
             }
         },
         CommandType::RANGE_SCAN => {
-            let min = input.split(" ").nth(1);
+            let min = tokens.get(1);
             if let Some(min) = min{
                 if !min.chars().all(|c| c.is_ascii_graphic()){
                     println!("error: min must only contain printable ascii characters");
@@ -184,10 +192,10 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
             }
             let min = min.unwrap();
 
-            let max = input.split(" ").nth(2);
+            let max = tokens.get(2);
             if let Some(max) = max{
                 if !min.chars().all(|c| c.is_ascii_graphic()){
-                    println!("error: min must only contain printable ascii characters");
+                    println!("error: max must only contain printable ascii characters");
                     return Ok(());
                 }
             }else{
@@ -198,8 +206,8 @@ fn execute_command(input: &str, cmd_type: CommandType) -> Result<(), ()>{
             let max = max.unwrap();
 
             // check for pagination
-            let page_size = input.split(" ").nth(3);
-            let page_number = input.split(" ").nth(4);
+            let page_size = tokens.get(3);
+            let page_number = tokens.get(4);
 
             if page_size.is_some() && page_number.is_some(){ // pagination
                 let page_size = page_size.unwrap();
@@ -317,6 +325,5 @@ mod tests{
         assert_eq!(get_tokens("   aa    aa aa    "), vec!["aa", "aa", "aa"]);
         assert_eq!(get_tokens("   aa \n\t\t\t\0                           a aa "), vec!["aa", "a", "aa"]);
         assert_eq!(get_tokens("aa\taa\naa\0aa"), vec!["aa", "aa", "aa", "aa"]);
-
     }
 }
