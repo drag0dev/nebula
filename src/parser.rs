@@ -244,7 +244,7 @@ fn get_tokens<'a>(input: &'a str) -> Vec<&'a str>{
     'outer: loop{
         // get to the start of a word
         next_char = iter.peek();
-        if next_char.is_none(){ // if we there is no more chars break
+        if next_char.is_none(){ // if there is no more chars break
             break 'outer;
         }else if !next_char.unwrap().is_ascii_graphic(){
             loop{ // get to the first printable char
@@ -255,7 +255,7 @@ fn get_tokens<'a>(input: &'a str) -> Vec<&'a str>{
                         break;
                     }
                 }else{
-                    break 'outer; // if no printable char was find, break
+                    break 'outer; // if no printable char was found, break
                 }
             }
         }
