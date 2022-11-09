@@ -157,6 +157,11 @@ fn execute_command(tokens: &Vec<&str>, cmd_type: CommandType) -> Result<(), ()>{
             todo!();
         },
         CommandType::LIST => {
+            if tokens.len() > 4 {
+                    println!("error: unrecognized additional arguments");
+                    println!("usage: LIST key [page-size page-number] (see HELP)");
+                    return Ok(());
+            }
             let prefix = tokens.get(1);
             if let Some(prefix) = prefix{
                 if !prefix.chars().all(|c| c.is_ascii_graphic()){
@@ -193,6 +198,11 @@ fn execute_command(tokens: &Vec<&str>, cmd_type: CommandType) -> Result<(), ()>{
             }
         },
         CommandType::RANGE_SCAN => {
+            if tokens.len() > 5{
+                println!("error: unrecognized additional arguments");
+                println!("usage: RANGESCAN min max [page-size page-number]");
+                return Ok(());
+            }
             let min = tokens.get(1);
             if let Some(min) = min{
                 if !min.chars().all(|c| c.is_ascii_graphic()){
