@@ -89,58 +89,72 @@ fn command_type(input: &str) -> Option<CommandType>{
 fn execute_command(tokens: &Vec<&str>, cmd_type: CommandType) -> Result<(), ()>{
     match cmd_type{
         CommandType::GET => {
-            let key = tokens.get(1);
-            if let Some(key) = key{
-                if !key.chars().all(|c| c.is_ascii_graphic()){
-                    println!("error: key must only contain printable ascii characters");
-                    return Ok(());
-                }
-                todo!();
-            }else {
+            if tokens.len() < 2{
                 println!("error: missing key");
                 println!("usage: GET key (see HELP)");
                 return Ok(());
             }
-        },
+            let mut keys: Vec<&str> = Vec::with_capacity(tokens.len() - 1);
 
-        CommandType::PUT => {
-            let key = tokens.get(1);
-            if let Some(key) = key{
+            for key in tokens.iter().skip(1){
                 if !key.chars().all(|c| c.is_ascii_graphic()){
                     println!("error: key must only contain printable ascii characters");
                     return Ok(());
                 }
-            }else{
+                keys.push(key);
+            }
+            todo!();
+        },
+
+        CommandType::PUT => {
+            if tokens.len() < 2 {
                 println!("error: missing key");
                 println!("usage: PUT key value (see HELP)");
                 return Ok(());
-            }
-            let key = key.unwrap();
-
-            let value = tokens.get(2);
-            if let Some(value) = value{
-            }else{
+            }else if tokens.len() < 3{
+                println!("error: missing value");
+                println!("usage: PUT key value (see HELP)");
+                return Ok(());
+            }else if ((tokens.len() - 1) % 2) !=  0 {
                 println!("error: missing value");
                 println!("usage: PUT key value (see HELP)");
                 return Ok(());
             }
-            let value = value.unwrap();
+            let mut keys: Vec<&str> = Vec::with_capacity((tokens.len() - 1) / 2);
+            let mut values: Vec<&str> = Vec::with_capacity((tokens.len() - 1) / 2);
+
+            for (i, item) in tokens.iter().skip(1).enumerate(){
+                if i % 2 == 0 && !item.chars().all(|c| c.is_ascii_graphic()){
+                    println!("error: key must only contain printable ascii characters");
+                    return Ok(());
+                }else {}
+
+                if i % 2 == 0{
+                    keys.push(item);
+                }else{
+                    values.push(item);
+                }
+            }
             todo!();
         },
 
         CommandType::DELETE => {
-            let key = tokens.get(1);
-            if let Some(key) = key{
-                if !key.chars().all(|c| c.is_ascii_graphic()){
-                    println!("error: key must only contain printable ascii characters");
-                    return Ok(());
-                }
-                todo!();
-            } else{
+            if tokens.len() < 2{
                 println!("error: missing key");
                 println!("usage: DELETE key (see HELP)");
                 return Ok(());
             }
+            let mut keys: Vec<&str> = Vec::with_capacity(tokens.len() - 1);
+
+            for key in tokens.iter().skip(1){
+                if !key.chars().all(|c| c.is_ascii_graphic()){
+                    println!("error: key must only contain printable ascii characters");
+                    return Ok(());
+                }
+                keys.push(key);
+
+            }
+            todo!();
         },
         CommandType::LIST => {
             let prefix = tokens.get(1);
