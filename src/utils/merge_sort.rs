@@ -45,7 +45,7 @@ mod tests{
     use super::*;
 
     #[test]
-    fn soring(){
+    fn sorting(){
         let mut test_vec = vec![5, 1 , 2, 4, 3];
         merge_sort(&mut test_vec);
         assert_eq!(test_vec, vec![1, 2, 3, 4, 5]);
