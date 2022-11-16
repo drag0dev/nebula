@@ -3,7 +3,7 @@ use bitvec::prelude::BitVec;
 use murmur3::murmur3_x64_128;
 use anyhow::{Result, Context};
 use rand::Rng;
-use crate::utils::*;
+use crate::utils::helpers::*;
 
 #[derive(Debug)]
 #[allow(dead_code)]
