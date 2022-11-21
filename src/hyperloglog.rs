@@ -15,11 +15,13 @@ pub struct HyperLogLog{
 
 // TODO: hardcoding a seed?
 const MURMUR_SEED: u32 = 1;
+const HLL_MIN_PRECISION: u8 = 4;
+const HLL_MAX_PRECISION: u8 = 16;
 
 impl HyperLogLog{
     /// will panic if number of buckets is not power of two
     pub fn new(number_of_bits: u8) -> Self{
-        if number_of_bits < 4 || number_of_bits > 16{
+        if number_of_bits < HLL_MIN_PRECISION || number_of_bits > HLL_MAX_PRECISION{
             panic!("Number of bits has to be in range [4, 16]!");
         }
         let number_of_buckets = 2u32.pow(number_of_bits as u32);
