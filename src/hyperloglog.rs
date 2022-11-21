@@ -1,25 +1,17 @@
-use std::{
-    io::Cursor,
-    hash::Hasher
-};
-use anyhow::{Result, Context};
-use murmur3::murmur3_x64_128;
+use std::hash::Hasher;
 use fnv::*;
 
 pub struct HyperLogLog{
     buckets: Vec<u8>,
-    number_of_buckets: u32,
     number_of_bits: u8,
-    alpha: f64, // correcting constant
+    set: f64,
 }
 
-// TODO: hardcoding a seed?
-const MURMUR_SEED: u32 = 1;
 const HLL_MIN_PRECISION: u8 = 4;
 const HLL_MAX_PRECISION: u8 = 16;
 
 impl HyperLogLog{
-    /// will panic if number of buckets is not power of two
+    /// will panic if number of buckets is not in range [4,16]
     pub fn new(number_of_bits: u8) -> Self{
         if number_of_bits < HLL_MIN_PRECISION || number_of_bits > HLL_MAX_PRECISION{
             panic!("Number of bits has to be in range [4, 16]!");
@@ -32,55 +24,67 @@ impl HyperLogLog{
         }
 
         HyperLogLog {
-            number_of_buckets,
-            number_of_bits, buckets,
-            alpha: alpha(number_of_bits as u8),
+            number_of_bits,
+            buckets,
+            set: (2 << number_of_bits) as f64,
         }
     }
 
-    pub fn add(&mut self, data: &[u8]) -> Result<()>{
-        //let hash = murmur3_x64_128(&mut Cursor::new(data), MURMUR_SEED)
-        //    .context("error hashing an item")?;
+    pub fn add(&mut self, data: &[u8]){
         let mut hasher = FnvHasher::default();
-        hasher.write("".as_bytes());
-        let hash = hasher.finish() as usize;
+        hasher.write(data);
+        let hash = hasher.finish();
 
-        // TODO: any reason to take other 64 bits?
-        // taking first 64 significant bits
-        // let hash = (hash >> 64) as usize;
         let bucket = hash >> (64 - self.number_of_bits);
-        let value = (hash << self.number_of_bits).trailing_zeros() as u8;
-        if value > self.buckets[bucket]{
-            self.buckets[bucket] = value;
+        let value = (hash << self.number_of_bits).trailing_zeros() + 1;
+        if value as u8 > self.buckets[bucket as usize]{
+            self.buckets[bucket as usize] = value as u8;
         }
-        Ok(())
+        // println!("hash: {}, bucket: {}, value: {}", hash, bucket, value);
     }
 
     pub fn count(&self) -> f64{
         let mut sum: f64 = 0.0;
+        let mut empty_buckets = 0;
         for bucket_value in self.buckets.iter(){
-            sum += 2f64.powf((*bucket_value as f64) * -1.0);
+            sum += (2f64.powf(*bucket_value as f64)).powf(-1.0);
+            if *bucket_value == 0{
+                empty_buckets += 1;
+            }
         }
-        self.alpha * (self.number_of_buckets as f64)* ((self.number_of_buckets as f64) / sum)
+        let alpha: f64 = 0.7213 / (1.0 + 1.079 / self.set);
+        let mut estimation = alpha * self.set.powf(2.0) / sum;
+        if estimation <= 2.5*self.set { // small range correction
+            if empty_buckets > 0 {
+                estimation = self.set * (self.set / empty_buckets as f64).log2();
+            }
+        }else if estimation > 1.0 / 30.0 * 2.0f64.powf(32.0){ // large range correction
+            estimation = -(2.0f64.powf(32.0)) * (1.0-estimation/2.0f64.powf(32.0)).log2();
+        }
+        estimation
     }
-}
-
-/// function that calculates alpha based on bits
-fn alpha(p: u8) -> f64{
-    0.7213 / (1.0 + 1.079 / ( 1 << p) as f64)
 }
 
 #[cfg(test)]
 mod tests{
     use super::*;
+    use rand::random;
 
     #[test]
     fn cardinality_8_bits(){
-        let mut hll = HyperLogLog::new(8);
+        let mut hll = HyperLogLog::new(4);
+        for _ in 0..500_000{
+            hll.add(&(random::<u32>()).clone().to_be_bytes());
+        }
+
+        /*
         hll.add("one".as_bytes());
         hll.add("two".as_bytes());
         hll.add("three".as_bytes());
         hll.add("four".as_bytes());
+        hll.add("asdasdasdasdasdads".as_bytes());
+        hll.add("stastad".as_bytes());
+        */
         assert_eq!(4, hll.count() as u64);
     }
 }
