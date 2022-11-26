@@ -9,10 +9,9 @@ pub fn modulo(num: u128, divisor: u128) -> usize {
 }
 
 /// find the closest power of 2 that is >= bit_arr_len
-/// expected number of items should be considered carefully especially if memory usage is important
+#[inline(always)]
 pub fn closest_pow(n: u64) -> u64{
-    let res: u64 = 1;
-    res << (64 - n.leading_zeros() - n.is_power_of_two() as u32)
+    1 << (64 - n.leading_zeros() - n.is_power_of_two() as u32)
 }
 
 pub fn load_seeds(filename: &str) -> Option<Vec<u32>>{
