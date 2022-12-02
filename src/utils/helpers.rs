@@ -9,15 +9,10 @@ pub fn modulo(num: u128, divisor: u128) -> usize {
 }
 
 /// find the closest power of 2 that is >= bit_arr_len
-/// expected number of items should be considered carefully especially if memory usage is important
+#[inline(always)]
 pub fn closest_pow(n: u64) -> u64{
-    let mut res: u64 = 2;
-    while res < n{
-        res = res << 1;
-    }
-    res
+    1 << (64 - n.leading_zeros() - n.is_power_of_two() as u32)
 }
-
 
 pub fn load_seeds(filename: &str) -> Option<Vec<u32>>{
     let file_contents = std::fs::read_to_string(filename);
@@ -72,8 +67,11 @@ mod tests{
     fn closest_pow_test(){
         assert_eq!(closest_pow(7), 8);
         assert_eq!(closest_pow(2), 2);
+        assert_eq!(closest_pow(256), 256);
         assert_eq!(closest_pow(120), 128);
         assert_eq!(closest_pow(240), 256);
+        assert_eq!(closest_pow(1000), 1024);
+        assert_eq!(closest_pow(1024), 1024);
     }
     #[test]
     fn writing_and_reading_seeds(){
