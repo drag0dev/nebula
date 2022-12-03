@@ -18,7 +18,7 @@ impl HyperLogLog{
         if number_of_bits < HLL_MIN_PRECISION || number_of_bits > HLL_MAX_PRECISION{
             panic!("Number of bits has to be in range [4, 16]!");
         }
-        let number_of_buckets = 2 << number_of_bits;
+        let number_of_buckets = 1 << number_of_bits;
 
         let mut buckets: Vec<u8> = Vec::with_capacity(number_of_buckets as usize);
         for _ in 0..number_of_buckets {
@@ -67,11 +67,13 @@ impl HyperLogLog{
         let alpha: f64 = 0.7213 / (1.0 + 1.079 / m);
         let mut estimation = alpha * m.powf(2.0) / sum;
 
-        if estimation <= 2.5*m { // small range correction
+        // lower bound alternate calculation
+        if estimation <= 2.5*m {
             if empty_buckets > 0 {
                 estimation = m * (m / empty_buckets as f64).log2();
             }
-        }else if estimation > 1.0 / 30.0 * 2.0f64.powf(32.0){ // large range correction
+        // upper bound alternate calculation
+        }else if estimation > 1.0 / 30.0 * 2.0f64.powf(32.0){
             estimation = -(2.0f64.powf(32.0)) * (1.0-estimation/2.0f64.powf(32.0)).log2();
         }
         estimation
