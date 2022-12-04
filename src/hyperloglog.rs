@@ -44,8 +44,23 @@ impl HyperLogLog{
 
         let bucket = hash >> (64 - self.number_of_bits);
 
-        let mask = 0b00001111_11111111_11111111_11111111_11111111_11111111_11111111_11111111;
-        let lower = hash & mask;
+        let mask: u64 = (0..self.number_of_bits).into_iter().map(|b| 2f64.powi(63 - b as i32) as u64).sum();
+        let lower = hash | mask;
+
+        // for 4 bits
+        // b  :   1000000000000000000000000000000000000000000000000000000000000000
+        // b  :   0100000000000000000000000000000000000000000000000000000000000000
+        // b  :   0010000000000000000000000000000000000000000000000000000000000000
+        // b  :   0001000000000000000000000000000000000000000000000000000000000000
+        // mask:  1111000000000000000000000000000000000000000000000000000000000000
+        //
+        // hash:  1100001010001001111101000010011100100101010000110101011100100000
+        // lower: 1111001010001001111101000010011100100101010000110101011100100000
+        //
+        // by setting the first n bits to 1,
+        // we avoid counting any zeros that are part of the bucket value
+        // in case of hashes such as 0b1000_000...000
+        // .trailing_zeros() would count the extra 3 zeros in the first 4 bits
 
         let zeros = lower.trailing_zeros() as u8 + 1;
 
