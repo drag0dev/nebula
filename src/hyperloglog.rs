@@ -43,7 +43,10 @@ impl HyperLogLog{
         //let hash: u64 = (hash >> 64).try_into().unwrap();
 
         let bucket = hash >> (64 - self.number_of_bits);
-        let lower = hash << self.number_of_bits;
+
+        let mask = 0b00001111_11111111_11111111_11111111_11111111_11111111_11111111_11111111;
+        let lower = hash & mask;
+
         let zeros = lower.trailing_zeros() as u8 + 1;
 
         if zeros > self.buckets[bucket as usize]{
@@ -69,11 +72,13 @@ impl HyperLogLog{
 
         // lower bound alternate calculation
         if estimation <= 2.5*m {
+            println!("LOWER");
             if empty_buckets > 0 {
                 estimation = m * (m / empty_buckets as f64).log2();
             }
         // upper bound alternate calculation
         }else if estimation > 1.0 / 30.0 * 2.0f64.powf(32.0){
+            println!("UPPER");
             estimation = -(2.0f64.powf(32.0)) * (1.0-estimation/2.0f64.powf(32.0)).log2();
         }
         estimation
