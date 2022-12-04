@@ -1,5 +1,3 @@
-use std::io::Cursor;
-use murmur3::murmur3_x64_128;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -33,35 +31,21 @@ impl HyperLogLog{
     }
 
     pub fn add(&mut self, data: &[u8]){
-        //let hash = murmur3_x64_128(&mut Cursor::new(data), 420).unwrap();
-
         let mut hasher = DefaultHasher::new();
         data.hash(&mut hasher);
         let hash = hasher.finish();
 
-        // only take 64 bits
-        //let hash: u64 = (hash >> 64).try_into().unwrap();
-
         let bucket = hash >> (64 - self.number_of_bits);
 
-        let mask: u64 = (0..self.number_of_bits).into_iter().map(|b| 1 << 63 - b as u64).sum();
+        let mut mask = 0;
+        for _ in 0..self.number_of_bits{
+            mask += 1;
+            mask = mask << 1;
+        }
+        // 63 beause its been shifted extra by loop above
+        mask = mask << 63 - self.number_of_bits;
+
         let lower = hash | mask;
-
-        // for 4 bits
-        // b  :   1000000000000000000000000000000000000000000000000000000000000000
-        // b  :   0100000000000000000000000000000000000000000000000000000000000000
-        // b  :   0010000000000000000000000000000000000000000000000000000000000000
-        // b  :   0001000000000000000000000000000000000000000000000000000000000000
-        // mask:  1111000000000000000000000000000000000000000000000000000000000000
-        //
-        // hash:  1100001010001001111101000010011100100101010000110101011100100000
-        // lower: 1111001010001001111101000010011100100101010000110101011100100000
-        //
-        // by setting the first n bits to 1,
-        // we avoid counting any zeros that are part of the bucket value
-        // in case of hashes such as 0b1000_000...000
-        // .trailing_zeros() would count the extra 3 zeros in the first 4 bits
-
         let zeros = lower.trailing_zeros() as u8 + 1;
 
         if zeros > self.buckets[bucket as usize]{
@@ -79,7 +63,6 @@ impl HyperLogLog{
                 empty_buckets += 1;
             }
         }
-        // println!("empty buckets: {}", empty_buckets);
 
         let m: f64 = self.set;
         let alpha: f64 = 0.7213 / (1.0 + 1.079 / m);
@@ -87,19 +70,18 @@ impl HyperLogLog{
 
         // lower bound alternate calculation
         if estimation <= 2.5*m {
-            // println!("LOWER");
             if empty_buckets > 0 {
                 estimation = m * (m / empty_buckets as f64).log2();
             }
         // upper bound alternate calculation
         }else if estimation > 1.0 / 30.0 * 2.0f64.powf(32.0){
-            // println!("UPPER");
             estimation = -(2.0f64.powf(32.0)) * (1.0-estimation/2.0f64.powf(32.0)).log2();
         }
         estimation
     }
 }
 
+// TODO: before merge comment out the test, since its only used for debugging
 #[cfg(test)]
 mod tests{
     use super::*;
@@ -115,7 +97,7 @@ mod tests{
             let mut temp: String;
             println!("number of buckets {} (bits {})", hll.set, i);
 
-            let samples = 10_000;
+            let samples = 100_000;
 
             for _ in 0..samples{
                 temp = rand::thread_rng()
