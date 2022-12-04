@@ -44,7 +44,7 @@ impl HyperLogLog{
 
         let bucket = hash >> (64 - self.number_of_bits);
 
-        let mask: u64 = (0..self.number_of_bits).into_iter().map(|b| 2f64.powi(63 - b as i32) as u64).sum();
+        let mask: u64 = (0..self.number_of_bits).into_iter().map(|b| 1 << 63 - b as u64).sum();
         let lower = hash | mask;
 
         // for 4 bits
@@ -79,7 +79,7 @@ impl HyperLogLog{
                 empty_buckets += 1;
             }
         }
-        println!("empty buckets: {}", empty_buckets);
+        // println!("empty buckets: {}", empty_buckets);
 
         let m: f64 = self.set;
         let alpha: f64 = 0.7213 / (1.0 + 1.079 / m);
@@ -87,13 +87,13 @@ impl HyperLogLog{
 
         // lower bound alternate calculation
         if estimation <= 2.5*m {
-            println!("LOWER");
+            // println!("LOWER");
             if empty_buckets > 0 {
                 estimation = m * (m / empty_buckets as f64).log2();
             }
         // upper bound alternate calculation
         }else if estimation > 1.0 / 30.0 * 2.0f64.powf(32.0){
-            println!("UPPER");
+            // println!("UPPER");
             estimation = -(2.0f64.powf(32.0)) * (1.0-estimation/2.0f64.powf(32.0)).log2();
         }
         estimation
@@ -107,12 +107,17 @@ mod tests{
 
     #[test]
     fn cardinality(){
+        // error : bits
+        let mut errors: Vec<(f64,u8)> = Vec::new();
+
         for i in 4..=16 {
             let mut hll = HyperLogLog::new(i);
             let mut temp: String;
-            println!("\n\nnumber of buckets {} (bits {})", hll.set, i);
+            println!("number of buckets {} (bits {})", hll.set, i);
 
-            for _ in 0..10_000{
+            let samples = 10_000;
+
+            for _ in 0..samples{
                 temp = rand::thread_rng()
                     .sample_iter::<char, _>(rand::distributions::Standard)
                     .take(20)
@@ -120,8 +125,26 @@ mod tests{
                 hll.add(&temp.as_bytes());
             }
 
-            println!("expected: 10000, found: {}", hll.count() as u64);
+            let estimation = hll.count() as u64;
+            let error = ((estimation as f64 - samples as f64).abs() / samples as f64) * 100.0;
+
+            errors.push((error, i));
+
+            println!("bits: {i} expected: {samples}, found: {}, error: {error}%\n" , hll.count() as u64);
         }
+
+        errors.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
+        for (e, b) in &errors {
+            println!("error: {:.2}%, bits: {b}", e);
+        }
+
+        let last = errors.len() - 1;
+        let best = errors[last].0;
+        let bits = errors[last].1;
+
+        println!("\nbest result:\nerror {best}% at {bits} bits\n");
+
         assert!(false);
     }
 }
