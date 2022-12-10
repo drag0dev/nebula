@@ -37,13 +37,7 @@ impl HyperLogLog{
 
         let bucket = hash >> (64 - self.number_of_bits);
 
-        let mut mask = 0;
-        for _ in 0..self.number_of_bits{
-            mask += 1;
-            mask = mask << 1;
-        }
-        // 63 beause its been shifted extra by loop above
-        mask = mask << 63 - self.number_of_bits;
+        let mask: u64 = ((1 << self.number_of_bits) - 1) << 64 - self.number_of_bits;
 
         let lower = hash | mask;
         let zeros = lower.trailing_zeros() as u8 + 1;
