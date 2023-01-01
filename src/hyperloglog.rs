@@ -75,52 +75,51 @@ impl HyperLogLog{
     }
 }
 
-// TODO: before merge comment out the test, since its only used for debugging
-#[cfg(test)]
-mod tests{
-    use super::*;
-    use rand::Rng;
+// #[cfg(test)]
+// mod tests{
+//     use super::*;
+//     use rand::Rng;
 
-    #[test]
-    fn cardinality(){
-        // error : bits
-        let mut errors: Vec<(f64,u8)> = Vec::new();
+//     #[test]
+//     fn cardinality(){
+//         // error : bits
+//         let mut errors: Vec<(f64,u8)> = Vec::new();
 
-        for i in 4..=16 {
-            let mut hll = HyperLogLog::new(i);
-            let mut temp: String;
-            println!("number of buckets {} (bits {})", hll.set, i);
+//         for i in 4..=16 {
+//             let mut hll = HyperLogLog::new(i);
+//             let mut temp: String;
+//             println!("number of buckets {} (bits {})", hll.set, i);
 
-            let samples = 100_000;
+//             let samples = 100_000;
 
-            for _ in 0..samples{
-                temp = rand::thread_rng()
-                    .sample_iter::<char, _>(rand::distributions::Standard)
-                    .take(20)
-                    .collect();
-                hll.add(&temp.as_bytes());
-            }
+//             for _ in 0..samples{
+//                 temp = rand::thread_rng()
+//                     .sample_iter::<char, _>(rand::distributions::Standard)
+//                     .take(20)
+//                     .collect();
+//                 hll.add(&temp.as_bytes());
+//             }
 
-            let estimation = hll.count() as u64;
-            let error = ((estimation as f64 - samples as f64).abs() / samples as f64) * 100.0;
+//             let estimation = hll.count() as u64;
+//             let error = ((estimation as f64 - samples as f64).abs() / samples as f64) * 100.0;
 
-            errors.push((error, i));
+//             errors.push((error, i));
 
-            println!("bits: {i} expected: {samples}, found: {}, error: {error}%\n" , hll.count() as u64);
-        }
+//             println!("bits: {i} expected: {samples}, found: {}, error: {error}%\n" , hll.count() as u64);
+//         }
 
-        errors.sort_by(|a, b| b.partial_cmp(a).unwrap());
+//         errors.sort_by(|a, b| b.partial_cmp(a).unwrap());
 
-        for (e, b) in &errors {
-            println!("error: {:.2}%, bits: {b}", e);
-        }
+//         for (e, b) in &errors {
+//             println!("error: {:.2}%, bits: {b}", e);
+//         }
 
-        let last = errors.len() - 1;
-        let best = errors[last].0;
-        let bits = errors[last].1;
+//         let last = errors.len() - 1;
+//         let best = errors[last].0;
+//         let bits = errors[last].1;
 
-        println!("\nbest result:\nerror {best}% at {bits} bits\n");
+//         println!("\nbest result:\nerror {best}% at {bits} bits\n");
 
-        assert!(false);
-    }
-}
+//         assert!(false);
+//     }
+// }
