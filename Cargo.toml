@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.66"
 bitvec = "1.0.1"
+fnv = "1.0.7"
 murmur3 = "0.5.2"
 rand = "0.8.5"
