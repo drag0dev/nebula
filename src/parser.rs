@@ -7,7 +7,7 @@ use std::io::{stdin, stdout};
 // TODO: error on extra words in command
 // TODO: todo macros all are going to be replaced with actual calls to the write/read path
 
-// aditional cli qol
+// additional cli qol
 // TODO: clear
 // TODO: up arrow for previous commands
 // TODO: tab
@@ -279,7 +279,7 @@ fn get_tokens<'a>(input: &'a str) -> Vec<&'a str>{
                         break;
                     }
                 }else{
-                    break 'outer; // if no printable char was found, break
+                    break 'outer; // if no printable char was found break
                 }
             }
         }
