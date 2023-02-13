@@ -3,6 +3,7 @@ mod count_min_sketch;
 mod utils;
 mod hyperloglog;
 mod parser;
+mod block;
 
 fn main() {
     let quit_status = parser::cli();
