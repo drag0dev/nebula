@@ -1,8 +1,6 @@
 use super::entry::Entry;
 use bytes::BufMut;
 
-// TODO: iter
-
 /// |CRC(u32),Timestamp(u128),Tombstone(u8),Key len(u64),Value len(8B),key, value|
 /// contains pairs of binary keys and values
 pub struct Block {
@@ -41,6 +39,9 @@ impl Block {
 
     /// decode binary block into a block
     pub fn decode(data: &[u8]) -> Self {
-        todo!();
+        Block {
+            data: data.to_owned(),
+            block_size: data.len()
+        }
     }
 }
