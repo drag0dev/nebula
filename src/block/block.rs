@@ -33,8 +33,8 @@ impl Block {
         self.data.put_u8(transaction.tombstone);
         self.data.put_u64(transaction.key_len);
         self.data.put_u64(transaction.value_len);
-        self.data.put(transaction.key);
-        self.data.put(transaction.value);
+        self.data.put(&transaction.key[..]);
+        self.data.put(&transaction.value[..]);
 
         return true;
     }

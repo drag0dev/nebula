@@ -1,6 +1,6 @@
 /// |CRC(u32),Timestamp(u128),Tombstone(u8),Key len(u64),Value len(8B),key,value|
 /// a single data entry
-pub struct Entry <'a>{
+pub struct Entry {
     pub crc: u32,
 
     /// nanos
@@ -16,6 +16,6 @@ pub struct Entry <'a>{
     /// value length
     pub value_len: u64,
 
-    pub key: &'a[u8],
-    pub value: &'a[u8],
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
 }
