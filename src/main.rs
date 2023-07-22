@@ -1,9 +1,6 @@
-mod bloomfilter;
-mod count_min_sketch;
 mod utils;
-mod hyperloglog;
 mod parser;
-mod block;
+mod building_blocks;
 
 fn main() {
     let quit_status = parser::cli();
