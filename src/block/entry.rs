@@ -1,5 +1,6 @@
 /// |CRC(u32),Timestamp(u128),Tombstone(u8),Key len(u64),Value len(8B),key,value|
 /// a single data entry
+#[derive(Clone, PartialEq, Debug)]
 pub struct Entry {
     pub crc: u32,
 
@@ -17,5 +18,7 @@ pub struct Entry {
     pub value_len: u64,
 
     pub key: Vec<u8>,
-    pub value: Vec<u8>,
+
+    /// value is optional incase of a tombstone
+    pub value: Option<Vec<u8>>
 }

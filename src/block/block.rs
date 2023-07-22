@@ -3,13 +3,14 @@ use bytes::BufMut;
 
 /// |CRC(u32),Timestamp(u128),Tombstone(u8),Key len(u64),Value len(8B),key, value|
 /// contains pairs of binary keys and values
+// TODO: could potentially be pub(super)
 pub struct Block {
-    data: Vec<u8>,
-    block_size: usize,
+    pub data: Vec<u8>,
+    pub block_size: usize,
 }
 
 /// entry size without the key and value
-const ENTRY_SIZE: usize = 4+16+1+8+8;
+pub const ENTRY_SIZE: usize = 4+16+1+8+8;
 
 impl Block {
     pub fn new(block_size: usize) -> Self {
@@ -20,9 +21,15 @@ impl Block {
     }
 
     pub fn add(&mut self, transaction: Entry) -> bool {
+        let mut unwarpped_value = &Vec::new();
+        let value_len;
+        if let Some(value) = transaction.value.as_ref() {
+            value_len = value.len();
+            unwarpped_value = value;
+        } else { value_len = 0; }
+
         // check if there is space for the transaction
-        if (self.data.len() + ENTRY_SIZE + transaction.key.len() + transaction.value.len()
-            ) > self.block_size {
+        if (self.data.len() + ENTRY_SIZE + transaction.key.len() + value_len) > self.block_size {
             return false;
         }
 
@@ -32,7 +39,7 @@ impl Block {
         self.data.put_u64(transaction.key_len);
         self.data.put_u64(transaction.value_len);
         self.data.put(&transaction.key[..]);
-        self.data.put(&transaction.value[..]);
+        if value_len > 0 { self.data.put(&unwarpped_value[..]); }
 
         return true;
     }
