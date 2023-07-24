@@ -1,6 +1,6 @@
+use std::cell::RefCell;
 use super::{
-    MemtableEntry,
-    StorageCRUD
+    MemtableEntry, StorageCRUD
 };
 
 pub struct Memtable <S>
@@ -32,7 +32,7 @@ where
         self.storage.create(entry);
     }
 
-    pub fn read(&mut self, key: String) -> Option<MemtableEntry> {
+    pub fn read(&mut self, key: String) -> Option<RefCell<MemtableEntry>> {
         self.storage.read(key)
     }
 
