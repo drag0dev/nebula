@@ -1,4 +1,7 @@
-use super::MemtableEntry;
+use super::{
+    MemtableEntry,
+    StorageCRUD
+};
 
 pub struct Memtable <S>
     where S: StorageCRUD<MemtableEntry> + IntoIterator
@@ -12,13 +15,3 @@ pub struct Memtable <S>
     pub capacity: u64,
 }
 
-pub trait StorageCRUD <T> {
-    fn create(item: T);
-    fn read(key: String) -> Option<T>;
-
-    /// updates an existing item, otherwise creates a new one
-    fn update(key: String, value: String);
-
-    /// sets entry tombstone field to true
-    fn delete(key: String);
-}
