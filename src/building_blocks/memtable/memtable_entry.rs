@@ -34,7 +34,7 @@ impl MemtableEntry {
     }
 }
 
-
+// TODO: merge sort has to be refactored to work with this
 impl PartialOrd for MemtableEntry {
     fn partial_cmp(&self, other: &MemtableEntry) -> Option<Ordering> {
         if self.lt(other) { Some(Ordering::Less) }
