@@ -10,3 +10,4 @@ pub use hyperloglog::HyperLogLog;
 pub use count_min_sketch::CountMinSketch;
 pub use memtable::Memtable;
 pub use memtable::StorageCRUD;
+pub use memtable::MemtableEntry;
