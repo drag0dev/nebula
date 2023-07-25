@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, Ord, Debug, Clone)]
 pub struct MemtableEntry {
     /// nanos
     pub timestamp: u128,
@@ -59,6 +59,7 @@ impl PartialOrd for MemtableEntry {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::MemtableEntry;
 
