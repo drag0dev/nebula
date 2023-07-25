@@ -20,10 +20,10 @@ impl<S> Memtable<S>
 where
     S: StorageCRUD<MemtableEntry> + IntoIterator
 {
-    pub fn new(storage: S, len: u64, capacity: u64) -> Self {
+    pub fn new(storage: S, capacity: u64) -> Self {
         Memtable{
             storage,
-            len,
+            len: 0,
             capacity
         }
     }
