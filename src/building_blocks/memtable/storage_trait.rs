@@ -17,6 +17,6 @@ pub trait StorageCRUD {
     /// clear all data in the storage
     fn clear(&mut self);
 
-    /// returnes all entries sorted by key
-    fn entries_sorted(&self) -> Vec<Rc<RefCell<MemtableEntry>>>;
+    /// returns all entries
+    fn entries(&self) -> Vec<Rc<RefCell<MemtableEntry>>>;
 }

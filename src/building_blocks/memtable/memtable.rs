@@ -5,7 +5,7 @@ use super::{
 
 pub struct Memtable <S>
 where
-    S: StorageCRUD + IntoIterator
+    S: StorageCRUD
 {
     storage: S,
 
@@ -18,9 +18,8 @@ where
 
 impl<S> Memtable<S>
 where
-    S: StorageCRUD + IntoIterator
-{
-    pub fn new(storage: S, capacity: u64) -> Self {
+    S: StorageCRUD
+{ pub fn new(storage: S, capacity: u64) -> Self {
         Memtable{
             storage,
             len: 0,

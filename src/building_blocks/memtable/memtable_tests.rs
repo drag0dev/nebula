@@ -51,13 +51,10 @@ impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
         self.clear();
     }
 
-    fn entries_sorted(&self) -> Vec<Rc<RefCell<MemtableEntry>>> {
-        let mut entries: Vec<Rc<RefCell<MemtableEntry>>> = self
-            .iter()
+    fn entries(&self) -> Vec<Rc<RefCell<MemtableEntry>>> {
+        self.iter()
             .map(|item| Rc::clone(item))
-            .collect();
-        entries.sort();
-        entries
+            .collect()
     }
 }
 
