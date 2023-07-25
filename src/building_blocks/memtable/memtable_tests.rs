@@ -115,3 +115,34 @@ fn delete() {
 
     assert_eq!(memtable.read("1".to_string()), Some(Rc::new(RefCell::new(entry.clone()))));
 }
+
+#[test]
+fn prefix_scan() {
+    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let mut memtable = Memtable::new(items, 10);
+
+    let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
+    memtable.create(entry.clone());
+
+    entry.key = "aaaa".into();
+    memtable.create(entry.clone());
+
+    entry.key = "bcasd".into();
+    memtable.create(entry.clone());
+
+    let entries = memtable.prefix_scan("aa".into());
+    assert_eq!(entries.len(), 2);
+
+    let entries = memtable.prefix_scan("bc".into());
+    assert_eq!(entries.len(), 1);
+
+    let entries = memtable.prefix_scan("da".into());
+    assert_eq!(entries.len(), 0);
+
+    // ignores tombstones
+    entry.value = None;
+    entry.key = "da".into();
+    memtable.create(entry.clone());
+    let entries = memtable.prefix_scan("da".into());
+    assert_eq!(entries.len(), 0);
+}

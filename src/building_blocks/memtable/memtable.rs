@@ -42,4 +42,17 @@ where
     pub fn delete(&mut self, entry: MemtableEntry) {
         self.storage.delete(entry);
     }
+
+    pub fn prefix_scan(&mut self, prefix: String) -> Vec<Rc<RefCell<MemtableEntry>>> {
+        let mut res = Vec::new();
+
+        for entry in self.storage.entries() {
+            let borrowed_entry = entry.borrow();
+            if borrowed_entry.key.starts_with(&prefix) && borrowed_entry.value.is_some() {
+                res.push(Rc::clone(&entry));
+            }
+        }
+
+        res
+    }
 }
