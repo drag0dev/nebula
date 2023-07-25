@@ -1,21 +1,22 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
+use super::MemtableEntry;
 
 /// the underlying structure used for storing memtable_entry implements given trait
-pub trait StorageCRUD <T> {
-    fn create(&mut self, item: T);
+pub trait StorageCRUD {
+    fn create(&mut self, item: MemtableEntry);
 
-    fn read(&mut self, key: String) -> Option<RefCell<T>>;
+    fn read(&mut self, key: String) -> Option<Rc<RefCell<MemtableEntry>>>;
 
     /// updates an existing item, otherwise creates a new one
-    fn update(&mut self, item: T);
+    fn update(&mut self, item: MemtableEntry);
 
     /// sets value field to None
-    /// if it doesnt exist create add passed entry
-    fn delete(&mut self, item: T);
+    /// if it doesnt exist create passed entry
+    fn delete(&mut self, item: MemtableEntry);
 
     /// clear all data in the storage
     fn clear(&mut self);
 
     /// returnes all entries sorted by key
-    fn entries_sorted(&self) -> Vec<RefCell<T>>;
+    fn entries_sorted(&self) -> Vec<Rc<RefCell<MemtableEntry>>>;
 }

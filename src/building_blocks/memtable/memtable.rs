@@ -1,11 +1,11 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 use super::{
     MemtableEntry, StorageCRUD
 };
 
 pub struct Memtable <S>
 where
-    S: StorageCRUD<MemtableEntry> + IntoIterator
+    S: StorageCRUD + IntoIterator
 {
     storage: S,
 
@@ -18,7 +18,7 @@ where
 
 impl<S> Memtable<S>
 where
-    S: StorageCRUD<MemtableEntry> + IntoIterator
+    S: StorageCRUD + IntoIterator
 {
     pub fn new(storage: S, capacity: u64) -> Self {
         Memtable{
@@ -32,7 +32,7 @@ where
         self.storage.create(entry);
     }
 
-    pub fn read(&mut self, key: String) -> Option<RefCell<MemtableEntry>> {
+    pub fn read(&mut self, key: String) -> Option<Rc<RefCell<MemtableEntry>>> {
         self.storage.read(key)
     }
 
