@@ -11,12 +11,14 @@ pub trait StorageCRUD {
     fn update(&mut self, item: MemtableEntry);
 
     /// sets value field to None
-    /// if it doesnt exist create passed entry
+    /// if it doesnt exist creates passed entry
     fn delete(&mut self, item: MemtableEntry);
 
     /// clear all data in the storage
     fn clear(&mut self);
 
+    // TODO: ideally this would return an Iterator
+    // possible solution is for structs implementing this trait to have a common iteartor struct
     /// returns all entries
     fn entries(&self) -> Vec<Rc<RefCell<MemtableEntry>>>;
 }

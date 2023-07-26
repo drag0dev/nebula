@@ -8,6 +8,7 @@ use super::{
     StorageCRUD
 };
 
+// TODO: only used for testing till skiplist/btree is implemented
 impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
     fn create(&mut self, item: MemtableEntry) {
         let res = self.iter().find(|entry| entry.borrow().key == item.key);
@@ -32,7 +33,7 @@ impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
     fn update(&mut self, item: MemtableEntry) {
         let old_item = self.iter().find(|entry| entry.borrow().key == item.key);
         if let Some(old_item) = old_item {
-            _ = old_item.replace(item);
+            _ = old_item.borrow_mut().update(item.value);
         } else {
             self.create(item);
         }
@@ -41,7 +42,7 @@ impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
     fn delete(&mut self, item: MemtableEntry) {
         let index = self.iter().position(|entry| entry.borrow().key == item.key);
         if let Some(index) = index {
-            _ = self.get(index).unwrap().borrow_mut().value = None;
+            _ = self.get(index).unwrap().borrow_mut().delete();
         } else {
             self.create(item);
         }

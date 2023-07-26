@@ -21,16 +21,16 @@ impl MemtableEntry {
     }
 
     /// delete == tombstone
-    /// there is no need for timestamp to be updated since all actions happen in memtable and are
-    /// all older than the enntry in the lsm tree if there is one
+    /// there is no need for timestamp to be updated since all actions happen in memtable inplace
+    /// and are older than the entry in the lsm tree if there is one
     pub fn delete(&mut self) {
         self.value = None;
     }
 
-    /// there is no need for timestamp to be updated since all actions happen in memtable and are
-    /// all older than the enntry in the lsm tree if there is one
-    pub fn update(&mut self, value: String) {
-        self.value = Some(value);
+    /// there is no need for timestamp to be updated since all actions happen in memtable inplace
+    /// and are older than the entry in the lsm tree if there is one
+    pub fn update(&mut self, value: Option<String>) {
+        self.value = value;
     }
 }
 

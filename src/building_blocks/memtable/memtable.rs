@@ -3,6 +3,8 @@ use super::{
     MemtableEntry, StorageCRUD
 };
 
+/// memetable flushes to the disk only when the amount of data inside memtable
+/// is greater or equal to capacity, in order to avoid checking multiple times for one action
 pub struct Memtable <S>
 where
     S: StorageCRUD
