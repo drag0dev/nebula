@@ -3,6 +3,7 @@ mod bloomfilter;
 mod hyperloglog;
 mod count_min_sketch;
 mod memtable;
+mod sstable;
 
 pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
@@ -11,3 +12,4 @@ pub use count_min_sketch::CountMinSketch;
 pub use memtable::Memtable;
 pub use memtable::StorageCRUD;
 pub use memtable::MemtableEntry;
+pub use sstable::Filter;
