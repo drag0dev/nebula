@@ -4,8 +4,9 @@ use murmur3::murmur3_x64_128;
 use anyhow::{Result, Context};
 use rand::Rng;
 use crate::utils::helpers::*;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct BloomFilter{
     item_count: u64,
@@ -29,24 +30,31 @@ impl BloomFilter{
         // hash functions = (size/item_count) * log(2)
         let hash_functions = ((bit_arr_len as f64 /item_count as f64) * 2_f64.log(EULER_NUMBER))
                             .round() as u64;
-        let seeds = match load_seeds("bf-seeds.txt"){
-            Some(seeds) => {
-                if hash_functions != seeds.len() as u64{
-                    panic!("Number of hash functions has to match number of seeds!");
-                }
-                seeds
-            },
-            None => {
-                // generate n seeds
-                let mut seeds: Vec<u32> = Vec::with_capacity(hash_functions as usize);
-                let mut rng = rand::thread_rng();
-                for _ in 0..hash_functions{
-                    seeds.push(rng.gen());
-                }
-                write_seeds(&seeds, "bf-seeds.txt");
-                seeds
-            }
-        };
+
+        let mut seeds: Vec<u32> = Vec::with_capacity(hash_functions as usize);
+        let mut rng = rand::thread_rng();
+        for _ in 0..hash_functions{
+            seeds.push(rng.gen());
+        }
+
+        // let seeds = match load_seeds("bf-seeds.txt"){
+        //     Some(seeds) => {
+        //         if hash_functions != seeds.len() as u64{
+        //             panic!("Number of hash functions has to match number of seeds!");
+        //         }
+        //         seeds
+        //     },
+        //     None => {
+        //         // generate n seeds
+        //         let mut seeds: Vec<u32> = Vec::with_capacity(hash_functions as usize);
+        //         let mut rng = rand::thread_rng();
+        //         for _ in 0..hash_functions{
+        //             seeds.push(rng.gen());
+        //         }
+        //         write_seeds(&seeds, "bf-seeds.txt");
+        //         seeds
+        //     }
+        // };
 
         let mut bit_arr = BitVec::with_capacity(bit_arr_len as usize);
 
