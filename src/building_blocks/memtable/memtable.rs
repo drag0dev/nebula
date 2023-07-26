@@ -55,4 +55,17 @@ where
 
         res
     }
+
+    pub fn range_scan(&mut self, start: String, end: String) -> Vec<Rc<RefCell<MemtableEntry>>> {
+        let mut res = Vec::new();
+
+        for entry in self.storage.entries() {
+            let borrowed_entry = entry.borrow();
+            if (borrowed_entry.key >= start && borrowed_entry.key <= end) && borrowed_entry.value.is_some() {
+                res.push(Rc::clone(&entry));
+            }
+        }
+
+        res
+    }
 }

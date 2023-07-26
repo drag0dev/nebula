@@ -146,3 +146,30 @@ fn prefix_scan() {
     let entries = memtable.prefix_scan("da".into());
     assert_eq!(entries.len(), 0);
 }
+
+#[test]
+fn range_scan() {
+    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let mut memtable = Memtable::new(items, 10);
+
+    let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
+    memtable.create(entry.clone());
+
+    entry.key = "accc".into();
+    memtable.create(entry.clone());
+
+    let entries = memtable.range_scan("aaaa".into(), "cccc".into());
+    assert_eq!(entries.len(), 2);
+
+    entry.key = "cccd".into();
+    memtable.create(entry.clone());
+
+    let entries = memtable.range_scan("aaaa".into(), "cccc".into());
+    assert_eq!(entries.len(), 2);
+
+    entry.key = "cccb".into();
+    memtable.create(entry.clone());
+
+    let entries = memtable.range_scan("aaaa".into(), "cccc".into());
+    assert_eq!(entries.len(), 3);
+}
