@@ -61,7 +61,7 @@ impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
 #[test]
 fn create() {
     let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
-    let mut memtable = Memtable::new(items, 10);
+    let mut memtable = Memtable::new(items, 256);
 
     assert!(memtable.read("0".to_string()).is_none());
 
@@ -78,7 +78,7 @@ fn create() {
 #[test]
 fn update() {
     let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
-    let mut memtable = Memtable::new(items, 10);
+    let mut memtable = Memtable::new(items, 256);
 
     let mut entry = MemtableEntry::new(0, "0".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
@@ -94,7 +94,7 @@ fn update() {
 #[test]
 fn delete() {
     let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
-    let mut memtable = Memtable::new(items, 10);
+    let mut memtable = Memtable::new(items, 256);
 
     assert!(memtable.read("0".to_string()).is_none());
 
@@ -119,7 +119,7 @@ fn delete() {
 #[test]
 fn prefix_scan() {
     let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
-    let mut memtable = Memtable::new(items, 10);
+    let mut memtable = Memtable::new(items, 256);
 
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
@@ -150,7 +150,7 @@ fn prefix_scan() {
 #[test]
 fn range_scan() {
     let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
-    let mut memtable = Memtable::new(items, 10);
+    let mut memtable = Memtable::new(items, 256);
 
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
@@ -172,4 +172,25 @@ fn range_scan() {
 
     let entries = memtable.range_scan("aaaa".into(), "cccc".into());
     assert_eq!(entries.len(), 3);
+}
+
+#[test]
+fn len() {
+    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let mut memtable = Memtable::new(items, 256);
+
+    // create
+    let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
+    memtable.create(entry.clone());
+    assert_eq!(memtable.len, 21);
+
+    // delete
+    entry.value = None;
+    memtable.delete(entry.clone());
+    assert_eq!(memtable.len, 41);
+
+    // update
+    entry.value = Some("123".into());
+    memtable.delete(entry);
+    assert_eq!(memtable.len, 64);
 }

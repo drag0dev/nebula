@@ -19,7 +19,8 @@ where
 impl<S> Memtable<S>
 where
     S: StorageCRUD
-{ pub fn new(storage: S, capacity: u64) -> Self {
+{
+    pub fn new(storage: S, capacity: u64) -> Self {
         Memtable{
             storage,
             len: 0,
@@ -28,19 +29,39 @@ where
     }
 
     pub fn create(&mut self, entry: MemtableEntry) {
+        self.update_len(&entry);
         self.storage.create(entry);
+
+        if self.len >= self.capacity {
+            // TODO: flush
+            unimplemented!();
+        }
     }
 
     pub fn read(&mut self, key: String) -> Option<Rc<RefCell<MemtableEntry>>> {
         self.storage.read(key)
     }
 
+    /// len is calculated as if all updates create a new entry, which is not always the case
     pub fn update(&mut self, entry: MemtableEntry) {
+        self.update_len(&entry);
         self.storage.update(entry);
+
+        if self.len >= self.capacity {
+            // TODO: flush
+            unimplemented!();
+        }
     }
 
+    /// len is calculated as if all deletes create a new entry, which is not always the case
     pub fn delete(&mut self, entry: MemtableEntry) {
+        self.update_len(&entry);
         self.storage.delete(entry);
+
+        if self.len >= self.capacity {
+            // TODO: flush
+            unimplemented!();
+        }
     }
 
     pub fn prefix_scan(&mut self, prefix: String) -> Vec<Rc<RefCell<MemtableEntry>>> {
@@ -67,5 +88,14 @@ where
         }
 
         res
+    }
+
+    fn update_len(&mut self, entry: &MemtableEntry) {
+        let value_len = if let Some(val) = entry.value.as_ref() { val.len() as u64 } else { 0 };
+
+        // 16 byes for timestamp
+        let new_size = 16 + entry.key.len() as u64 + value_len;
+
+        self.len += new_size;
     }
 }
