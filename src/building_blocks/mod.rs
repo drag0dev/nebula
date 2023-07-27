@@ -34,3 +34,4 @@ pub use memtable::Memtable;
 pub use memtable::StorageCRUD;
 pub use memtable::MemtableEntry;
 pub use sstable::Filter;
+pub use sstable::IndexBuilder;
