@@ -4,7 +4,7 @@ use std::{fs::File, io::Write};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IndexEntry {
     pub key: String,
     pub offset: u64,
