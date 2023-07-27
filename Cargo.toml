@@ -12,6 +12,7 @@ bitvec = { version = "1.0.1", features = ["serde"] }
 bytes = "1.4.0"
 crc = "3.0.1"
 fnv = "1.0.7"
+lazy_static = "1.4.0"
 murmur3 = "0.5.2"
 rand = "0.8.5"
 serde = { version = "1.0.175", features = ["derive"] }

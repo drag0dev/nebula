@@ -1,3 +1,24 @@
+use bincode::{
+    options,
+    Options,
+    config::{
+        WithOtherIntEncoding,
+        WithOtherEndian,
+        WithOtherTrailing,
+        DefaultOptions,
+        RejectTrailing,
+        LittleEndian,
+        FixintEncoding
+    }
+};
+type BincodeOptions = WithOtherIntEncoding<WithOtherEndian<WithOtherTrailing<DefaultOptions, RejectTrailing>, LittleEndian>, FixintEncoding>;
+lazy_static::lazy_static! {
+    pub static ref BINCODE_OPTIONS: BincodeOptions = options()
+            .reject_trailing_bytes()
+            .with_little_endian()
+            .with_fixint_encoding();
+}
+
 mod entry;
 mod bloomfilter;
 mod hyperloglog;

@@ -1,9 +1,9 @@
 use std::{fs::File, io::{Read, Write}};
 use anyhow::{Result, Context, anyhow};
-use bincode::{Options, options};
+use bincode::Options;
 use serde::{Serialize, Deserialize};
 use crc::{Crc, CRC_32_JAMCRC};
-use crate::building_blocks::BloomFilter;
+use crate::building_blocks::{BloomFilter, BINCODE_OPTIONS};
 
 // TODO: BloomFilter and CMS writing its own seed to a file redundant
 
@@ -26,11 +26,6 @@ impl Filter {
     }
 
     pub fn read_from_file(mut file: File) -> Result<Self> {
-        let ser_options = options()
-            .reject_trailing_bytes()
-            .with_little_endian()
-            .with_fixint_encoding();
-
         let mut filter_bin = Vec::new();
         let filter_bin_len = file.read_to_end(&mut filter_bin)
             .context("reading filter")?;
@@ -40,7 +35,7 @@ impl Filter {
         let expected_crc = crc.checksum(&filter_bin[..filter_bin_len-4]);
 
         // crc present in the file
-        let file_crc: u32 = ser_options.deserialize(&filter_bin[filter_bin_len-4..])
+        let file_crc: u32 = BINCODE_OPTIONS.deserialize(&filter_bin[filter_bin_len-4..])
             .context("deserilizing crc")?;
 
         if file_crc != expected_crc {
@@ -48,7 +43,7 @@ impl Filter {
         }
 
         // NOTE: even though bf and crc are encoded separately it can be decoded all at once
-        let filter_deser: Filter = ser_options
+        let filter_deser: Filter = BINCODE_OPTIONS
             .deserialize(&filter_bin[..])
             .context("deserializing filter")?;
 
@@ -56,18 +51,13 @@ impl Filter {
     }
 
     pub fn write_to_file(&mut self, mut file: File) -> Result<()> {
-        let ser_options = options()
-            .reject_trailing_bytes()
-            .with_little_endian()
-            .with_fixint_encoding();
-
-        let mut filter_ser = ser_options
+        let mut filter_ser = BINCODE_OPTIONS
             .serialize(&self.bf)
             .context("serializing bloomfilter")?;
 
         self.crc = Crc::<u32>::new(&CRC_32_JAMCRC).checksum(&filter_ser[..]);
 
-        let ser_crc = ser_options.serialize(&self.crc)
+        let ser_crc = BINCODE_OPTIONS.serialize(&self.crc)
             .context("serializing crc")?;
 
         filter_ser.extend_from_slice(&ser_crc[..]);
