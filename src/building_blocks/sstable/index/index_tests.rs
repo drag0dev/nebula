@@ -29,8 +29,7 @@ fn read_valid() {
 
     let mut index = 0;
     for entry in index_iter {
-        println!("{entry:?}");
-        // assert!(entry.is_ok());
+        assert!(entry.is_ok());
         let entry = entry.unwrap();
         assert_eq!(entry.key, index.to_string());
         assert_eq!(entry.offset, index);
