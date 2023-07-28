@@ -1,4 +1,4 @@
-use std::fs::OpenOptions;
+use std::{fs::OpenOptions, io::Seek};
 use super::{IndexBuilder, IndexIterator};
 
 #[test]
@@ -12,10 +12,34 @@ fn writing() {
 
     let mut index_builder = IndexBuilder::new(file);
 
+    let mut offset = 0;
     for i in 0..10 {
-        index_builder.add(i.to_string(), i)
+        let new_offset = index_builder.add(i.to_string(), i)
             .expect("error adding index entry");
+        assert_eq!(new_offset, offset);
+        offset += 25;
     }
+    offset -= 25;
+
+    // read by offsets
+    let mut file = OpenOptions::new()
+        .read(true)
+        .open("test-data/valid-index-write")
+        .expect("error opening 'valid-index-write'");
+
+    // seek to the last offset
+    let pos = file.seek(std::io::SeekFrom::Start(offset)).expect("seeking in the 'valid-index-write'");
+    assert_eq!(pos, offset);
+
+    let mut index_iter = IndexIterator::iter(file);
+    let entry = index_iter.next();
+    assert!(entry.is_some());
+    let entry = entry.unwrap();
+    assert!(entry.is_ok());
+    let entry = entry.unwrap();
+
+    assert_eq!(entry.key, "9".to_string());
+    assert_eq!(entry.offset, 9);
 }
 
 #[test]

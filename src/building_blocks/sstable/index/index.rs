@@ -12,23 +12,25 @@ pub struct IndexEntry {
 
 /// every entry is individually encoded
 /// each entry is written in format: serialized length + encoded entry
+/// offset tracks at which offset each index entry is written
 pub struct IndexBuilder {
     file: File,
+    index_offset: u64,
 }
 
 impl IndexBuilder {
     pub fn new(file: File) -> Self {
-        IndexBuilder { file }
+        IndexBuilder { file, index_offset: 0 }
     }
 
-    pub fn add(&mut self, key: String, offset: u64) -> Result<()> {
+    pub fn add(&mut self, key: String, offset: u64) -> Result<u64> {
         let entry = IndexEntry { key, offset };
         let entry_ser = BINCODE_OPTIONS
             .serialize(&entry)
             .context("serializing entry")?;
 
         let entry_len: u64 = entry_ser.len() as u64;
-        let mut len_ser = BINCODE_OPTIONS
+        let len_ser = BINCODE_OPTIONS
             .serialize(&entry_len)
             .context("serializing entry len")?;
 
@@ -38,6 +40,11 @@ impl IndexBuilder {
         self.file.write_all(&entry_ser)
             .context("writing entry to the file")?;
 
-        Ok(())
+        let old_offset = self.index_offset;
+
+        // offset moved by a single entry len
+        self.index_offset += len_ser.len() as u64 + entry_ser.len() as u64;
+
+        Ok(old_offset)
     }
 }
