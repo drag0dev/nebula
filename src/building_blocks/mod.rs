@@ -40,3 +40,4 @@ pub use sstable::Filter;
 pub use sstable::IndexBuilder;
 pub use sstable::IndexEntry;
 pub use sstable::IndexIterator;
+pub use sstable::{SSTableConfig, FileOrganization};
