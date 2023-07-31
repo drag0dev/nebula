@@ -73,7 +73,7 @@ impl BloomFilter{
         }
     }
 
-    pub fn add(&mut self, item: &str) -> Result<()>{
+    pub fn add(&mut self, item: &[u8]) -> Result<()>{
         for seed in self.seeds.iter(){
             let hash_result = murmur3_x64_128(&mut Cursor::new(item), *seed)
                 .context("error hashing an item")?;
@@ -82,7 +82,7 @@ impl BloomFilter{
         Ok(())
     }
 
-    pub fn check(&self, item: &str) -> Result<bool>{
+    pub fn check(&self, item: &[u8]) -> Result<bool>{
         for seed in self.seeds.iter(){
             let hash_result = murmur3_x64_128(&mut Cursor::new(item), *seed)
                 .context("error hashing an item")?;
@@ -102,11 +102,11 @@ mod tests{
     fn present_value(){
         let mut bf = BloomFilter::new(100_000, 0.02);
 
-        assert_eq!(bf.add("temp").unwrap(), ());
-        assert_eq!(bf.check("temp").unwrap(), true);
+        assert_eq!(bf.add(b"temp").unwrap(), ());
+        assert_eq!(bf.check(b"temp").unwrap(), true);
 
-        assert_eq!(bf.check("temp1").unwrap(), false);
-        assert_eq!(bf.add("temp1").unwrap(), ());
-        assert_eq!(bf.check("temp1").unwrap(), true);
+        assert_eq!(bf.check(b"temp1").unwrap(), false);
+        assert_eq!(bf.add(b"temp1").unwrap(), ());
+        assert_eq!(bf.check(b"temp1").unwrap(), true);
     }
 }

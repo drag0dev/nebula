@@ -84,7 +84,7 @@ mod tests {
             .expect("trying to open 'valid-filter-write'");
 
         let mut filter = Filter::new(10, 0.01);
-        assert!(filter.bf.add("asd").is_ok());
+        assert!(filter.bf.add(b"asd").is_ok());
 
         assert!(filter.write_to_file(file).is_ok());
     }
@@ -100,7 +100,7 @@ mod tests {
         assert!(filter.is_ok());
         let filter = filter.unwrap();
 
-        let present = filter.bf.check("asd").expect("error checking bf");
+        let present = filter.bf.check(b"asd").expect("error checking bf");
         assert!(present);
     }
 
