@@ -14,7 +14,7 @@ fn writing() {
 
     let mut offset = 0;
     for i in 0..10 {
-        let new_offset = index_builder.add(i.to_string(), i)
+        let new_offset = index_builder.add(&i.to_string().into_bytes(), i)
             .expect("error adding index entry");
         assert_eq!(new_offset, offset);
         offset += 25;
@@ -38,7 +38,7 @@ fn writing() {
     assert!(entry.is_ok());
     let entry = entry.unwrap();
 
-    assert_eq!(entry.key, "9".to_string());
+    assert_eq!(entry.key, "9".to_string().into_bytes());
     assert_eq!(entry.offset, 9);
 }
 
@@ -55,7 +55,7 @@ fn read_valid() {
     for entry in index_iter {
         assert!(entry.is_ok());
         let entry = entry.unwrap();
-        assert_eq!(entry.key, index.to_string());
+        assert_eq!(entry.key, index.to_string().into_bytes());
         assert_eq!(entry.offset, index);
         index += 1;
     }

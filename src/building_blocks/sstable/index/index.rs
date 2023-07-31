@@ -6,7 +6,7 @@ use anyhow::{Result, Context};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IndexEntry {
-    pub key: String,
+    pub key: Vec<u8>,
     pub offset: u64,
 }
 
@@ -23,8 +23,8 @@ impl IndexBuilder {
         IndexBuilder { file, index_offset: 0 }
     }
 
-    pub fn add(&mut self, key: String, offset: u64) -> Result<u64> {
-        let entry = IndexEntry { key, offset };
+    pub fn add(&mut self, key: &Vec<u8>, offset: u64) -> Result<u64> {
+        let entry = IndexEntry { key: key.clone(), offset };
         let entry_ser = BINCODE_OPTIONS
             .serialize(&entry)
             .context("serializing entry")?;
