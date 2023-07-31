@@ -9,8 +9,8 @@ pub static MAX_SUMMARY_ENTRY_LEN: u64 = 2 * MAX_KEY_LEN + 8;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SummaryEntry {
-    pub first_key: String,
-    pub last_key: String,
+    pub first_key: Vec<u8>,
+    pub last_key: Vec<u8>,
     pub offset: u64,
 }
 
@@ -27,8 +27,8 @@ impl SummaryBuilder {
         SummaryBuilder { file }
     }
 
-    pub fn add(&mut self, first_key: String, last_key: String, offset: u64) -> Result<()> {
-        let entry = SummaryEntry { first_key, last_key, offset };
+    pub fn add(&mut self, first_key: &Vec<u8>, last_key: &Vec<u8>, offset: u64) -> Result<()> {
+        let entry = SummaryEntry { first_key: first_key.clone(), last_key: last_key.clone(), offset };
         let entry_ser = BINCODE_OPTIONS
             .serialize(&entry)
             .context("serializing summary entry")?;

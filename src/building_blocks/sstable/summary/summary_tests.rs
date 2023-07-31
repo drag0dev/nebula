@@ -13,10 +13,10 @@ fn writing() {
     let mut summary_builder = SummaryBuilder::new(file);
 
     // 'footer'
-    assert!(summary_builder.add("0".into(), "99".into(), 0).is_ok());
+    assert!(summary_builder.add(&"0".to_string().into_bytes(), &"99".to_string().into_bytes(), 0).is_ok());
 
     for i in (0..100).step_by(10) {
-        assert!(summary_builder.add(i.to_string(), (i+9).to_string(), i*10).is_ok());
+        assert!(summary_builder.add(&i.to_string().into_bytes(), &(i+9).to_string().into_bytes(), i*10).is_ok());
     }
 }
 
@@ -34,16 +34,16 @@ fn read_valid() {
     let footer = footer.unwrap();
     assert!(footer.is_ok());
     let footer = footer.unwrap();
-    assert_eq!(footer.first_key, "0".to_string());
-    assert_eq!(footer.last_key, "99".to_string());
+    assert_eq!(footer.first_key, "0".to_string().into_bytes());
+    assert_eq!(footer.last_key, "99".to_string().into_bytes());
     assert_eq!(footer.offset, 0);
 
     let mut index = 0;
     for entry in summary_iter {
         assert!(entry.is_ok());
         let entry = entry.unwrap();
-        assert_eq!(entry.first_key, index.to_string());
-        assert_eq!(entry.last_key, (index+9).to_string());
+        assert_eq!(entry.first_key, index.to_string().into_bytes());
+        assert_eq!(entry.last_key, (index+9).to_string().into_bytes());
         assert_eq!(entry.offset, index*10);
         index += 10;
     }
