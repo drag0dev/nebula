@@ -11,14 +11,13 @@ use super::{IndexBuilder, SummaryBuilder, Filter};
 use crate::building_blocks::{MemtableEntry, Entry};
 
 // TODO: metadata
-// TODO: generation should be &str for compactions?
 
 /// data - Memtable entries from which SSTable and aiding structures it are generated
 /// data_dir - directory where SSTables are stored
 /// generation - generation of the SSTable (name of the directory where this SSTable is going to be written to)
 /// filter_fp_prob - filter false positive probability
 /// summary_nth - from SSTable config - how many entries should summary have
-pub fn build(data: Vec<MemtableEntry>, data_dir: &str, generation: usize, filter_fp_prob: f64, summary_nth: u64) -> Result<()> {
+pub fn build(data: Vec<MemtableEntry>, data_dir: &str, generation: &str, filter_fp_prob: f64, summary_nth: u64) -> Result<()> {
     assert!(data.len() != 0);
 
     let dir_path = format!("{}/{}", data_dir, generation);
