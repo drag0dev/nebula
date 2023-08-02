@@ -4,6 +4,8 @@ use serde::{Serialize, Deserialize};
 use bincode::Options;
 use crate::building_blocks::BINCODE_OPTIONS;
 use super::MemtableEntry;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 /// |CRC(u32),Timestamp(u128),Tombstone(u8),Key len(u64),Value len(8B),key,value|
 /// a single data entry
@@ -18,9 +20,9 @@ pub struct Entry {
     pub value: Option<Vec<u8>>
 }
 
-impl From<&MemtableEntry> for Entry {
-    fn from(memtable_entry: &MemtableEntry) -> Self {
-        let value = if let Some(value) = memtable_entry.value.as_ref() {
+impl From<Rc<RefCell<MemtableEntry>>> for Entry {
+    fn from(memtable_entry: Rc<RefCell<MemtableEntry>>) -> Self {
+        let value = if let Some(value) = memtable_entry.borrow().value.as_ref() {
             let value_vec = value
                 .chars()
                 .map(|c| c as u8)
@@ -30,13 +32,13 @@ impl From<&MemtableEntry> for Entry {
             None
         };
 
-        let key = memtable_entry.key
+        let key = memtable_entry.borrow().key
             .chars()
             .map(|c| c as u8)
             .collect::<Vec<u8>>();
 
         Entry {
-            timestamp: memtable_entry.timestamp,
+            timestamp: memtable_entry.borrow().timestamp,
             key,
             value
         }
