@@ -20,9 +20,9 @@ pub struct Entry {
     pub value: Option<Vec<u8>>
 }
 
-impl From<Rc<RefCell<MemtableEntry>>> for Entry {
-    fn from(memtable_entry: Rc<RefCell<MemtableEntry>>) -> Self {
-        let value = if let Some(value) = memtable_entry.borrow().value.as_ref() {
+impl From<&MemtableEntry> for Entry {
+    fn from(memtable_entry: &MemtableEntry) -> Self {
+        let value = if let Some(value) = memtable_entry.value.as_ref() {
             let value_vec = value
                 .chars()
                 .map(|c| c as u8)
@@ -32,13 +32,13 @@ impl From<Rc<RefCell<MemtableEntry>>> for Entry {
             None
         };
 
-        let key = memtable_entry.borrow().key
+        let key = memtable_entry.key
             .chars()
             .map(|c| c as u8)
             .collect::<Vec<u8>>();
 
         Entry {
-            timestamp: memtable_entry.borrow().timestamp,
+            timestamp: memtable_entry.timestamp,
             key,
             value
         }

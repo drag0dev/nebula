@@ -4,7 +4,9 @@ use std::{
         create_dir,
         OpenOptions
     },
-    io::Write
+    io::Write,
+    rc::Rc,
+    cell::RefCell
 };
 use anyhow::{Result, Context};
 use super::{IndexBuilder, SummaryBuilder, Filter};
@@ -12,71 +14,127 @@ use crate::building_blocks::{MemtableEntry, Entry};
 
 // TODO: metadata
 
-/// data - Memtable entries from which SSTable and aiding structures it are generated
-/// data_dir - directory where SSTables are stored
-/// generation - generation of the SSTable (name of the directory where this SSTable is going to be written to)
-/// filter_fp_prob - filter false positive probability
-/// summary_nth - from SSTable config - how many entries should summary have
-pub fn build(data: Vec<MemtableEntry>, data_dir: &str, generation: &str, filter_fp_prob: f64, summary_nth: u64) -> Result<()> {
-    assert!(data.len() != 0);
+/// SSTable builder where aiding structures are in a separate files
+pub struct SSTableBuilder {
+    index: IndexBuilder,
+    summary: SummaryBuilder,
+    //metadata: ?,
+    filter: Filter,
+    filter_file: File,
+    sstable_file: File,
+    sstable_offset: u64,
+    summary_offset: u64,
+    index_offset: u64,
+    summary_nth: u64,
+    entries_written: u64,
 
-    let dir_path = format!("{}/{}", data_dir, generation);
-    create_dir(&dir_path)
-        .context("creating the generation dirctory")?;
+    // the first entry in the current range of the summary
+    first_entry_range: Option<Rc<Entry>>,
 
-    let mut sstable_file = create_file(&dir_path, "data")?;
-    let index_file = create_file(&dir_path, "index")?;
-    let summary_file = create_file(&dir_path, "summary")?;
-    let filter_file = create_file(&dir_path, "filter")?;
-    // let metadata_file = create_file(&dir_path, "metadata")?;
+    // need to keep track in order to be able to write total range and last entry in the current range
+    first_entry_written: Option<Rc<Entry>>,
+    last_entry_written: Option<Rc<Entry>>,
+}
 
-    let mut index = IndexBuilder::new(index_file);
-    let mut summary = SummaryBuilder::new(summary_file);
-    let mut filter = Filter::new(data.len() as u64, filter_fp_prob);
+impl SSTableBuilder {
+    /// item_count - number of items to be written
+    /// data_dir - directory where SSTables are stored
+    /// generation - generation of the SSTable (name of the directory where this SSTable is going to be written to)
+    /// filter_fp_prob - filter false positive probability
+    /// summary_nth - from SSTable config - how many entries should summary have
+    pub fn new(data_dir: &str, generation: &str, item_count: u64, filter_fp_prob: f64, summary_nth: u64) -> Result<Self> {
+        let dir_path = format!("{}/{}", data_dir, generation);
+        create_dir(&dir_path)
+            .context("creating the generation dirctory")?;
 
-    // required for the index
-    let mut sstable_offset = 0u64;
+        let sstable_file = create_file(&dir_path, "data")?;
+        let index_file = create_file(&dir_path, "index")?;
+        let summary_file = create_file(&dir_path, "summary")?;
+        let filter_file = create_file(&dir_path, "filter")?;
+        // let metadata_file = create_file(&dir_path, "metadata")?;
 
-    // tracks the index offset for the first_key in the summary entry
-    let mut summary_offset = 0u64;
+        let index = IndexBuilder::new(index_file);
+        let summary = SummaryBuilder::new(summary_file);
+        let filter = Filter::new(item_count, filter_fp_prob);
 
-    // adding the range to summary at the beginning
-    range_summary(&mut summary, data.first().unwrap(), data.last().unwrap())?;
+        Ok(SSTableBuilder {
+            index,
+            summary,
+            filter,
+            filter_file,
+            sstable_file,
+            sstable_offset: 0,
+            summary_offset: 0,
+            index_offset: 0,
+            summary_nth,
+            entries_written: 0,
+            first_entry_range: None,
+            first_entry_written: None,
+            last_entry_written: None,
+        })
+    }
 
-    let mut first_key = memtable_entry_key_to_vec(&data.first().unwrap());
-    let mut index_offset = 0;
-    for (i, memtable_entry) in data.iter().enumerate() {
-        let entry = Entry::from(memtable_entry);
+    pub fn insert(&mut self, entry: &MemtableEntry) -> Result<()> {
+        self.entries_written += 1;
+        let entry = Rc::new(Entry::from(entry));
         let entry_ser = entry.serialize()?;
 
-        sstable_file.write_all(&entry_ser)
+        // only happens once
+        if self.first_entry_written.is_none() {
+            self.first_entry_written = Some(Rc::clone(&entry));
+        }
+
+        self.sstable_file.write_all(&entry_ser)
             .context("writign entry into the sstable file")?;
 
-        filter.bf.add(&entry.key)?;
-        index_offset = index.add(&entry.key, sstable_offset)
+        self.filter.bf.add(&entry.key)?;
+
+        self.index_offset = self.index.add(&entry.key, self.sstable_offset)
             .context("adding index entry")?;
 
-        sstable_offset += entry_ser.len() as u64;
+        self.sstable_offset += entry_ser.len() as u64;
 
-        if i as u64 % summary_nth == 0 {
-            summary.add(&first_key, &entry.key, summary_offset)
-                .context("adding summary entry")?;
-            first_key = entry.key.clone();
-            summary_offset = index_offset;
+        self.last_entry_written = Some(Rc::clone(&entry));
+
+        if self.first_entry_range.is_none() {
+            self.first_entry_range = Some(Rc::clone(&entry));
         }
+
+        if self.entries_written as u64 % self.summary_nth == 0 {
+            self.summary.add(
+                &self.first_entry_range.as_ref().unwrap().key,
+                &self.last_entry_written.as_ref().unwrap().key,
+                self.summary_offset)
+                .context("adding summary entry")?;
+            self.first_entry_range = None;
+            self.summary_offset = self.index_offset;
+        }
+
+        Ok(())
     }
 
-    // if the number of memtable entries is not divisable by summary_nth write the last incomplete entry in the summary
-    if summary_offset != index_offset {
-        let last_key = memtable_entry_key_to_vec(&data.last().unwrap());
-        summary.add(&first_key, &last_key, summary_offset)
-            .context("adding incomplete last summary entry")?;
+    /// write the last incomplete entry in the summary and the total range
+    /// flush the filter to the file
+    pub fn finish(&mut self) -> Result<()> {
+        if self.summary_offset != self.index_offset {
+            assert!(self.first_entry_range.is_some());
+            self.summary.add(
+                &self.first_entry_range.as_ref().unwrap().key,
+                &self.last_entry_written.as_ref().unwrap().key,
+                self.summary_offset)
+                .context("adding incomplete last summary entry")?;
+        }
+
+        assert!(self.first_entry_written.is_some());
+        assert!(self.last_entry_written.is_some());
+        self.summary.total_range(&self.first_entry_written.as_ref().unwrap().key, &self.last_entry_written.as_ref().unwrap().key, 0)
+            .context("writing total range and last entry in the current range")?;
+
+        self.filter.write_to_file(&mut self.filter_file)
+            .context("writing filter to the file")?;
+        Ok(())
     }
 
-    filter.write_to_file(filter_file)
-        .context("writing filter to the file")?;
-
-    Ok(())
 }
 
 fn create_file(dir: &str, file_name: &str) -> Result<File> {
