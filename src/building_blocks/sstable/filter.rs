@@ -50,7 +50,7 @@ impl Filter {
         Ok(filter_deser)
     }
 
-    pub fn write_to_file(&mut self, mut file: File) -> Result<()> {
+    pub fn write_to_file(&mut self, file: &mut File) -> Result<()> {
         let mut filter_ser = BINCODE_OPTIONS
             .serialize(&self.bf)
             .context("serializing bloomfilter")?;
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn write() {
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(true)
             .truncate(true)
             .write(true)
@@ -86,7 +86,7 @@ mod tests {
         let mut filter = Filter::new(10, 0.01);
         assert!(filter.bf.add(b"asd").is_ok());
 
-        assert!(filter.write_to_file(file).is_ok());
+        assert!(filter.write_to_file(&mut file).is_ok());
     }
 
     #[test]
