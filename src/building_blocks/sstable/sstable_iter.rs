@@ -22,16 +22,17 @@ impl<'a> SSTableIterator<'a> {
     }
 
     /// offset from the beginning of the file
-    pub fn move_and_red(&mut self, offset: u64) -> Option<Result<Entry>> {
-        let res = self.sstable_file.seek(SeekFrom::Start(offset))
-            .context("seeking sstable file");
-        if let Err(e) = res { return Some(Err(e)); }
-
-        self.read()
+    pub fn move_iter(&mut self, offset: u64) -> Result<()> {
+        self.sstable_file.seek(SeekFrom::Start(offset))
+            .context("seeking sstable file")?;
+        Ok(())
     }
+}
 
-    /// None indicates that there is no more entries
-    fn read(&mut self) -> Option<Result<Entry>> {
+impl Iterator for SSTableIterator<'_> {
+    type Item = Result<Entry>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         let mut len_ser = vec![0; 8];
         let res = self.sstable_file.read_exact(&mut len_ser);
         if let Err(e) = res.as_ref() {
@@ -59,14 +60,6 @@ impl<'a> SSTableIterator<'a> {
         let entry = entry.unwrap();
 
         Some(Ok(entry))
-    }
-}
-
-impl Iterator for SSTableIterator<'_> {
-    type Item = Result<Entry>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.read()
     }
 }
 
