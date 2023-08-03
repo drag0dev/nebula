@@ -31,7 +31,7 @@ fn writing() {
     let pos = file.seek(std::io::SeekFrom::Start(offset)).expect("seeking in the 'valid-index-write'");
     assert_eq!(pos, offset);
 
-    let mut index_iter = IndexIterator::iter(file);
+    let mut index_iter = IndexIterator::iter(&file);
     let entry = index_iter.next();
     assert!(entry.is_some());
     let entry = entry.unwrap();
@@ -49,7 +49,7 @@ fn read_valid() {
         .open("test-data/valid-index-read")
         .expect("error opening 'valid-index-read'");
 
-    let index_iter = IndexIterator::iter(file);
+    let index_iter = IndexIterator::iter(&file);
 
     let mut index = 0;
     for entry in index_iter {
@@ -68,7 +68,7 @@ fn read_invalid() {
         .open("test-data/invalid-index-read")
         .expect("error opening 'invalid-index-read'");
 
-    let index_iter = IndexIterator::iter(file);
+    let index_iter = IndexIterator::iter(&file);
 
     let mut corrupted = false;
     for entry in index_iter {

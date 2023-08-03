@@ -4,17 +4,17 @@ use anyhow::{Result, Context, anyhow};
 use bincode::Options;
 use std::{fs::File, io::Read};
 
-pub struct IndexIterator {
-    file: File
+pub struct IndexIterator<'a> {
+    file: &'a File
 }
 
-impl IndexIterator {
-    pub fn iter(file: File) -> Self {
+impl<'a> IndexIterator<'a> {
+    pub fn iter(file: &'a File) -> Self {
         IndexIterator { file }
     }
 }
 
-impl Iterator for IndexIterator {
+impl Iterator for IndexIterator<'_> {
     type Item = Result<IndexEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
