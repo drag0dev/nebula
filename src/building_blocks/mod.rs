@@ -36,8 +36,10 @@ pub use count_min_sketch::CountMinSketch;
 pub use memtable::Memtable;
 pub use memtable::StorageCRUD;
 pub use memtable::MemtableEntry;
-pub use sstable::Filter;
-pub use sstable::IndexBuilder;
-pub use sstable::IndexEntry;
-pub use sstable::IndexIterator;
-pub use sstable::{SSTableConfig, FileOrganization};
+pub use sstable::{
+    Filter,
+    IndexBuilder, IndexIterator, IndexEntry,
+    SummaryBuilder, SummaryEntry, SummaryIterator,
+    SSTableConfig, FileOrganization,
+    SSTableBuilder, SSTableReader, SSTableIterator
+};
