@@ -4,8 +4,6 @@ use serde::{Serialize, Deserialize};
 use bincode::Options;
 use crate::building_blocks::BINCODE_OPTIONS;
 use super::MemtableEntry;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 /// |CRC(u32),Timestamp(u128),Tombstone(u8),Key len(u64),Value len(8B),key,value|
 /// a single data entry
@@ -69,7 +67,7 @@ impl Entry {
         Ok(len_ser)
     }
 
-    /// crc found in the file
+    /// expected slice: crc(4b)+entry
     pub fn deserialize(entry: &[u8]) -> Result<Entry> {
         let crc_deser: u32 = BINCODE_OPTIONS
             .deserialize(&entry[..4])
