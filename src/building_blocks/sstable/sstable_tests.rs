@@ -22,6 +22,7 @@ fn read_valid_sstable_multifile() {
     let sstable_reader = SSTableReader::load("test-data/read-valid-sstable-multifile")
         .expect("reading sstable");
 
+    // test sstable entries
     let mut i = 0;
     for entry in sstable_reader.iter() {
         let entry = entry.expect("reading entry");
@@ -35,18 +36,40 @@ fn read_valid_sstable_multifile() {
         i += 1;
     }
 
+    // test index
     let mut data_iter = sstable_reader.iter();
-
     let random_entry_index = sstable_reader.index_iter()
         .nth(10)
         .unwrap()
-        .unwrap();
+        .expect("reading eleventh entry in the index");
 
-    let random_entry_read = data_iter
-        .move_and_red(random_entry_index.offset)
-        .unwrap()
-        .unwrap();
+    data_iter.move_iter(random_entry_index.offset)
+        .expect("moving sstable iter");
+
+    let random_entry_read = data_iter.next().unwrap().expect("reading random sstable entry");
     assert_eq!(random_entry_read.key, 10.to_string().into_bytes());
+
+    // test summary
+    let (mut summary_iter, _) = sstable_reader
+        .summary_iter()
+        .expect("getting summary iter");
+
+    let random_entry_summary = summary_iter
+        .nth(5)
+        .unwrap()
+        .expect("getting fifth entry in the summary");
+
+    let mut index_iter = sstable_reader.index_iter();
+    index_iter.move_iter(random_entry_summary.offset).expect("moving index iter");
+
+    let index_entry = index_iter.next().unwrap().expect("reading random index entry");
+    assert_eq!(index_entry.key, 49.to_string().into_bytes());
+
+    // test filter
+    for i in 0..100 {
+        let check = sstable_reader.filter.bf.check(&i.to_string().into_bytes()).expect("checking key in the filter");
+        assert_eq!(check, true);
+    }
 }
 
 #[test]
