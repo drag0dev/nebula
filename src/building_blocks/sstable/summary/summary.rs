@@ -7,7 +7,7 @@ use anyhow::{Result, Context};
 /// two keys max len + 8bytes for offset
 pub static MAX_SUMMARY_ENTRY_LEN: u64 = 2 * MAX_KEY_LEN + 8;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct SummaryEntry {
     pub first_key: Vec<u8>,
     pub last_key: Vec<u8>,
