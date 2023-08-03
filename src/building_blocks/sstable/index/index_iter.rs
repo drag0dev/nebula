@@ -2,7 +2,7 @@ use crate::building_blocks::{BINCODE_OPTIONS, MAX_KEY_LEN};
 use super::IndexEntry;
 use anyhow::{Result, Context, anyhow};
 use bincode::Options;
-use std::{fs::File, io::Read};
+use std::{fs::File, io::{Read, Seek, SeekFrom}};
 
 pub struct IndexIterator<'a> {
     file: &'a File
@@ -11,6 +11,19 @@ pub struct IndexIterator<'a> {
 impl<'a> IndexIterator<'a> {
     pub fn iter(file: &'a File) -> Self {
         IndexIterator { file }
+    }
+
+    pub fn rewind(&mut self) -> Result<()> {
+        self.file.rewind()
+            .context("rewiding index file")?;
+        Ok(())
+    }
+
+    /// offset from the beginning of the file
+    pub fn move_iter(&mut self, offset: u64) -> Result<()> {
+        self.file.seek(SeekFrom::Start(offset))
+            .context("seeking index file")?;
+        Ok(())
     }
 }
 
