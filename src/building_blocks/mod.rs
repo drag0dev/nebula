@@ -41,5 +41,5 @@ pub use sstable::{
     IndexBuilder, IndexIterator, IndexEntry,
     SummaryBuilder, SummaryEntry, SummaryIterator,
     SSTableConfig, FileOrganization,
-    SSTableBuilder, SSTableReader, SSTableIterator
+    SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile
 };

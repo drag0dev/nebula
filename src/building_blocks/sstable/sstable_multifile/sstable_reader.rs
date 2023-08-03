@@ -1,8 +1,9 @@
 use anyhow::{Result, Context};
 use std::fs::{File, OpenOptions};
-use super::{IndexIterator, Filter, SummaryIterator, SummaryEntry, SSTableIterator};
+use super::SSTableIteratorMultiFile;
+use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, Filter};
 
-pub struct SSTableReader {
+pub struct SSTableReaderMultiFile {
     pub filter: Filter,
     index_file: File,
     summary_file: File,
@@ -10,7 +11,7 @@ pub struct SSTableReader {
     sstable_file: File,
 }
 
-impl SSTableReader {
+impl SSTableReaderMultiFile {
     pub fn load(sstabel_dir: &str) -> Result<Self> {
         let filter_file = open_file(sstabel_dir, "filter")
             .context("opening filter file")?;
@@ -27,7 +28,7 @@ impl SSTableReader {
         let sstable_file = open_file(sstabel_dir, "data")
             .context("opening data file")?;
 
-        Ok(SSTableReader {
+        Ok(SSTableReaderMultiFile {
             filter,
             index_file,
             summary_file,
@@ -35,8 +36,8 @@ impl SSTableReader {
         })
     }
 
-    pub fn iter(&self) -> SSTableIterator {
-        SSTableIterator::iter(&self.sstable_file)
+    pub fn iter(&self) -> SSTableIteratorMultiFile {
+        SSTableIteratorMultiFile::iter(&self.sstable_file)
     }
 
     pub fn index_iter(&self) -> IndexIterator {

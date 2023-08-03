@@ -1,17 +1,20 @@
 use anyhow::{Result, Context};
 use bincode::Options;
-use std::{fs::File, io::{Seek, SeekFrom, Read}};
+use std::{
+    fs::File,
+    io::{Seek, SeekFrom, Read}
+};
 use crate::building_blocks::{Entry, BINCODE_OPTIONS};
 
 /// Iterator trait next function will continue reading where the file cursor is at
 /// if you need to go from the beginning call rewind()
-pub struct SSTableIterator<'a> {
+pub struct SSTableIteratorMultiFile<'a> {
     sstable_file: &'a File,
 }
 
-impl<'a> SSTableIterator<'a> {
+impl<'a> SSTableIteratorMultiFile<'a> {
     pub fn iter(file: &'a File) -> Self {
-        SSTableIterator { sstable_file: file }
+        SSTableIteratorMultiFile { sstable_file: file }
     }
 
     /// move to the beginning of the file
@@ -29,7 +32,7 @@ impl<'a> SSTableIterator<'a> {
     }
 }
 
-impl Iterator for SSTableIterator<'_> {
+impl Iterator for SSTableIteratorMultiFile<'_> {
     type Item = Result<Entry>;
 
     fn next(&mut self) -> Option<Self::Item> {

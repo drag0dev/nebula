@@ -5,17 +5,19 @@ use std::{
         OpenOptions
     },
     io::Write,
-    rc::Rc,
-    cell::RefCell
+    rc::Rc
 };
 use anyhow::{Result, Context};
-use super::{IndexBuilder, SummaryBuilder, Filter};
-use crate::building_blocks::{MemtableEntry, Entry};
+use crate::building_blocks::{
+    Filter, SummaryBuilder,
+    IndexBuilder, MemtableEntry,
+    Entry
+};
 
 // TODO: metadata
 
 /// SSTable builder where aiding structures are in a separate files
-pub struct SSTableBuilder {
+pub struct SSTableBuilderMultiFile {
     index: IndexBuilder,
     summary: SummaryBuilder,
     //metadata: ?,
@@ -36,7 +38,7 @@ pub struct SSTableBuilder {
     last_entry_written: Option<Rc<Entry>>,
 }
 
-impl SSTableBuilder {
+impl SSTableBuilderMultiFile {
     /// item_count - number of items to be written
     /// data_dir - directory where SSTables are stored
     /// generation - generation of the SSTable (name of the directory where this SSTable is going to be written to)
@@ -57,7 +59,7 @@ impl SSTableBuilder {
         let summary = SummaryBuilder::new(summary_file);
         let filter = Filter::new(item_count, filter_fp_prob);
 
-        Ok(SSTableBuilder {
+        Ok(SSTableBuilderMultiFile {
             index,
             summary,
             filter,

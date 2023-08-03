@@ -1,9 +1,9 @@
 use crate::building_blocks::{MemtableEntry, Entry};
-use super::{SSTableBuilder, SSTableReader};
+use super::{SSTableBuilderMultiFile, SSTableReaderMultiFile};
 
 #[test]
 fn write_sstable_multifile() {
-    let mut sstable = SSTableBuilder::new("test-data", "write-sstable-multifile", 100, 0.1, 10)
+    let mut sstable = SSTableBuilderMultiFile::new("test-data", "write-sstable-multifile", 100, 0.1, 10)
         .expect("creating a sstable");
 
     for i in 0..100 {
@@ -19,7 +19,7 @@ fn write_sstable_multifile() {
 
 #[test]
 fn read_valid_sstable_multifile() {
-    let sstable_reader = SSTableReader::load("test-data/read-valid-sstable-multifile")
+    let sstable_reader = SSTableReaderMultiFile::load("test-data/read-valid-sstable-multifile")
         .expect("reading sstable");
 
     // test sstable entries
@@ -74,7 +74,7 @@ fn read_valid_sstable_multifile() {
 
 #[test]
 fn read_invalid_sstable_multifile() {
-    let sstable_reader = SSTableReader::load("test-data/read-invalid-sstable-multifile")
+    let sstable_reader = SSTableReaderMultiFile::load("test-data/read-invalid-sstable-multifile")
         .expect("reading sstable");
     let mut corrupted = false;
     for entry in sstable_reader.iter() {
