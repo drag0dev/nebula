@@ -3,6 +3,7 @@ mod index;
 mod summary;
 mod sstable_config;
 mod sstable_multifile;
+mod sstable_singlefile;
 
 pub use filter::Filter;
 pub use index::IndexBuilder;
