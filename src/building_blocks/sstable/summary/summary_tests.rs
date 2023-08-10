@@ -17,7 +17,7 @@ fn writing() {
     }
 
     // total range
-    assert!(summary_builder.total_range(&"0".to_string().into_bytes(), &"99".to_string().into_bytes(), 0).is_ok());
+    assert!(summary_builder.total_range(&"0".to_string().into_bytes(), &"99".to_string().into_bytes()).is_ok());
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn read_valid() {
         .open("test-data/valid-summary-read")
         .expect("error opening 'valid-summary-read'");
 
-    let (summary_iter, global_range) = SummaryIterator::iter(&file)
+    let (summary_iter, global_range) = SummaryIterator::iter(file)
         .expect("reading summary");
 
     assert_eq!(global_range.first_key, "0".to_string().into_bytes());
@@ -52,7 +52,7 @@ fn read_invalid_entry() {
         .open("test-data/invalid-entry-summary-read")
         .expect("error opening 'invalid-entry-summary-read'");
 
-    let (summary_iter, _) = SummaryIterator::iter(&file).unwrap();
+    let (summary_iter, _) = SummaryIterator::iter(file).unwrap();
     let mut corrupted = false;
     for entry in summary_iter {
         if entry.is_err() {
@@ -70,6 +70,6 @@ fn read_invalid_total_range() {
         .open("test-data/invalid-range-summary-read")
         .expect("error opening 'invalid-range-summary-read'");
 
-    let iter = SummaryIterator::iter(&file);
+    let iter = SummaryIterator::iter(file);
     assert!(iter.is_err());
 }

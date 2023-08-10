@@ -10,8 +10,8 @@ use std::{
 use super::SummaryEntry;
 
 
-pub struct SummaryIterator<'a> {
-    file: &'a File,
+pub struct SummaryIterator {
+    file: File,
 
     /// number of bytes read so far
     amount_read: i64,
@@ -22,8 +22,8 @@ pub struct SummaryIterator<'a> {
 
 }
 
-impl<'a> SummaryIterator<'a> {
-    pub fn iter(file: &'a File) -> Result<(Self, SummaryEntry)> {
+impl SummaryIterator {
+    pub fn iter(file: File) -> Result<(Self, SummaryEntry)> {
         let mut iter = SummaryIterator {
             file,
             amount_read: 0,
@@ -63,7 +63,7 @@ impl<'a> SummaryIterator<'a> {
     }
 }
 
-impl Iterator for SummaryIterator<'_> {
+impl Iterator for SummaryIterator {
     type Item = Result<SummaryEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {

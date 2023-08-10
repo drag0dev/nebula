@@ -24,7 +24,7 @@ fn read_valid_sstable_multifile() {
 
     // test sstable entries
     let mut i = 0;
-    for entry in sstable_reader.iter() {
+    for entry in sstable_reader.iter().expect("getting sstable iter") {
         let entry = entry.expect("reading entry");
         let expected_entry = Entry {
             key: i.to_string().into_bytes(),
@@ -37,8 +37,8 @@ fn read_valid_sstable_multifile() {
     }
 
     // test index
-    let mut data_iter = sstable_reader.iter();
-    let random_entry_index = sstable_reader.index_iter()
+    let mut data_iter = sstable_reader.iter().expect("getting data iter");
+    let random_entry_index = sstable_reader.index_iter().expect("getting index iter")
         .nth(10)
         .unwrap()
         .expect("reading eleventh entry in the index");
@@ -59,7 +59,7 @@ fn read_valid_sstable_multifile() {
         .unwrap()
         .expect("getting fifth entry in the summary");
 
-    let mut index_iter = sstable_reader.index_iter();
+    let mut index_iter = sstable_reader.index_iter().expect("getting index iter");
     index_iter.move_iter(random_entry_summary.offset).expect("moving index iter");
 
     let index_entry = index_iter.next().unwrap().expect("reading random index entry");
@@ -77,7 +77,7 @@ fn read_invalid_sstable_multifile() {
     let sstable_reader = SSTableReaderMultiFile::load("test-data/read-invalid-sstable-multifile")
         .expect("reading sstable");
     let mut corrupted = false;
-    for entry in sstable_reader.iter() {
+    for entry in sstable_reader.iter().expect("getting sstable iter") {
         if entry.is_err() {
             corrupted = true;
             break;
