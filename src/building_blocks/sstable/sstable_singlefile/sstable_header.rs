@@ -3,7 +3,10 @@ use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
 use crate::building_blocks::BINCODE_OPTIONS;
 
-/// all the offsets are the offsets from the beginning from the file
+pub static HEADER_SIZE: u64 = 32;
+
+/// all the offsets are the offsets from the beginning from the file not including the filter
+/// itself
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SSTableHeader {
     /// data_offset is just the size of the SSTableHeader length
@@ -23,7 +26,7 @@ impl SSTableHeader {
         }
     }
 
-    pub fn serialize(&mut self) -> Result<Vec<u8>> {
+    pub fn serialize(&self) -> Result<Vec<u8>> {
         let header_ser =
         BINCODE_OPTIONS
             .serialize(&self)

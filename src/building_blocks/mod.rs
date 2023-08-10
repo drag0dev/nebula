@@ -37,9 +37,8 @@ pub use memtable::Memtable;
 pub use memtable::StorageCRUD;
 pub use memtable::MemtableEntry;
 pub use sstable::{
-    Filter,
     IndexBuilder, IndexIterator, IndexEntry,
     SummaryBuilder, SummaryEntry, SummaryIterator,
     SSTableConfig, FileOrganization,
-    SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile
+    SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile,
 };
