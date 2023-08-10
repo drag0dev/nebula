@@ -67,7 +67,7 @@ fn read_valid_sstable_multifile() {
 
     // test filter
     for i in 0..100 {
-        let check = sstable_reader.filter.bf.check(&i.to_string().into_bytes()).expect("checking key in the filter");
+        let check = sstable_reader.filter.check(&i.to_string().into_bytes()).expect("checking key in the filter");
         assert_eq!(check, true);
     }
 }

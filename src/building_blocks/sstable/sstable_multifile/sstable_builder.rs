@@ -9,9 +9,9 @@ use std::{
 };
 use anyhow::{Result, Context};
 use crate::building_blocks::{
-    Filter, SummaryBuilder,
+    SummaryBuilder,
     IndexBuilder, MemtableEntry,
-    Entry
+    Entry, BloomFilter
 };
 
 // TODO: metadata
@@ -22,7 +22,7 @@ pub struct SSTableBuilderMultiFile {
     index: IndexBuilder,
     summary: SummaryBuilder,
     //metadata: ?,
-    filter: Filter,
+    filter: BloomFilter,
     filter_file: File,
     sstable_file: File,
     sstable_offset: u64,
@@ -58,7 +58,7 @@ impl SSTableBuilderMultiFile {
 
         let index = IndexBuilder::new(index_file);
         let summary = SummaryBuilder::new(summary_file);
-        let filter = Filter::new(item_count, filter_fp_prob);
+        let filter = BloomFilter::new(item_count, filter_fp_prob);
 
         Ok(SSTableBuilderMultiFile {
             index,
@@ -90,7 +90,7 @@ impl SSTableBuilderMultiFile {
         self.sstable_file.write_all(&entry_ser)
             .context("writign entry into the sstable file")?;
 
-        self.filter.bf.add(&entry.key)?;
+        self.filter.add(&entry.key)?;
 
         self.index_offset = self.index.add(&entry.key, self.sstable_offset)
             .context("adding index entry")?;

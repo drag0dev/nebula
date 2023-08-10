@@ -1,10 +1,10 @@
 use anyhow::{Result, Context};
 use std::fs::{File, OpenOptions};
 use super::SSTableIteratorMultiFile;
-use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, Filter};
+use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, BloomFilter};
 
 pub struct SSTableReaderMultiFile {
-    pub filter: Filter,
+    pub filter: BloomFilter,
     index_file: File,
     summary_file: File,
     // metadata: ?,
@@ -16,7 +16,7 @@ impl SSTableReaderMultiFile {
         let filter_file = open_file(sstabel_dir, "filter")
             .context("opening filter file")?;
 
-        let filter = Filter::read_from_file(filter_file)
+        let filter = BloomFilter::read_from_file(filter_file)
             .context("reading filter")?;
 
         let index_file = open_file(sstabel_dir, "index")
