@@ -15,6 +15,7 @@ use crate::building_blocks::{
 };
 
 // TODO: metadata
+// TODO: syncing file manually
 
 /// SSTable builder where aiding structures are in a separate files
 pub struct SSTableBuilderMultiFile {
@@ -129,7 +130,7 @@ impl SSTableBuilderMultiFile {
 
         assert!(self.first_entry_written.is_some());
         assert!(self.last_entry_written.is_some());
-        self.summary.total_range(&self.first_entry_written.as_ref().unwrap().key, &self.last_entry_written.as_ref().unwrap().key, 0)
+        self.summary.total_range(&self.first_entry_written.as_ref().unwrap().key, &self.last_entry_written.as_ref().unwrap().key)
             .context("writing total range and last entry in the current range")?;
 
         self.filter.write_to_file(&mut self.filter_file)

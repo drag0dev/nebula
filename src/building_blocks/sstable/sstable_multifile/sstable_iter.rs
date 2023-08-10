@@ -10,17 +10,19 @@ use crate::building_blocks::{Entry, BINCODE_OPTIONS};
 /// if you need to go from the beginning call rewind()
 pub struct SSTableIteratorMultiFile<'a> {
     sstable_file: &'a File,
+    pub (in crate::building_blocks::sstable) current_offset: u64,
 }
 
 impl<'a> SSTableIteratorMultiFile<'a> {
     pub fn iter(file: &'a File) -> Self {
-        SSTableIteratorMultiFile { sstable_file: file }
+        SSTableIteratorMultiFile { sstable_file: file, current_offset: 0 }
     }
 
     /// move to the beginning of the file
     pub fn rewind(&mut self) -> Result<()> {
         self.sstable_file.rewind()
             .context("rewinding sstable file")?;
+        self.current_offset = 0;
         Ok(())
     }
 
@@ -28,6 +30,7 @@ impl<'a> SSTableIteratorMultiFile<'a> {
     pub fn move_iter(&mut self, offset: u64) -> Result<()> {
         self.sstable_file.seek(SeekFrom::Start(offset))
             .context("seeking sstable file")?;
+        self.current_offset = offset;
         Ok(())
     }
 }
@@ -62,7 +65,7 @@ impl Iterator for SSTableIteratorMultiFile<'_> {
         if let Err(e) = entry { return Some(Err(e)); }
         let entry = entry.unwrap();
 
+        self.current_offset += 8 + 4 + len;
         Some(Ok(entry))
     }
 }
-
