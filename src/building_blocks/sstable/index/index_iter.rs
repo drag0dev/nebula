@@ -5,17 +5,19 @@ use bincode::Options;
 use std::{fs::File, io::{Read, Seek, SeekFrom}};
 
 pub struct IndexIterator<'a> {
-    file: &'a File
+    file: &'a File,
+    pub (in crate::building_blocks::sstable) current_offset: u64,
 }
 
 impl<'a> IndexIterator<'a> {
     pub fn iter(file: &'a File) -> Self {
-        IndexIterator { file }
+        IndexIterator { file, current_offset: 0 }
     }
 
     pub fn rewind(&mut self) -> Result<()> {
         self.file.rewind()
             .context("rewiding index file")?;
+        self.current_offset = 0;
         Ok(())
     }
 
@@ -23,6 +25,7 @@ impl<'a> IndexIterator<'a> {
     pub fn move_iter(&mut self, offset: u64) -> Result<()> {
         self.file.seek(SeekFrom::Start(offset))
             .context("seeking index file")?;
+        self.current_offset = offset;
         Ok(())
     }
 }
@@ -64,6 +67,7 @@ impl Iterator for IndexIterator<'_> {
             .context("deserializing entry");
         if let Err(e) = entry { return Some(Err(e)); }
 
+        self.current_offset = 8+len;
         Some(entry)
     }
 }
