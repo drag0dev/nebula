@@ -36,17 +36,23 @@ impl SSTableReaderMultiFile {
         })
     }
 
-    pub fn iter(&self) -> SSTableIteratorMultiFile {
-        SSTableIteratorMultiFile::iter(&self.sstable_file)
+    pub fn iter(&self) -> Result<SSTableIteratorMultiFile> {
+        let fd = self.sstable_file.try_clone()
+            .context("cloning fd")?;
+        Ok(SSTableIteratorMultiFile::iter(fd))
     }
 
-    pub fn index_iter(&self) -> IndexIterator {
-        IndexIterator::iter(&self.index_file)
+    pub fn index_iter(&self) -> Result<IndexIterator> {
+        let fd = self.index_file.try_clone()
+            .context("cloning fd")?;
+        Ok(IndexIterator::iter(fd))
     }
 
     /// returns the iterator and the global range
     pub fn summary_iter(&self) -> Result<(SummaryIterator, SummaryEntry)> {
-        SummaryIterator::iter(&self.summary_file)
+        let fd = self.summary_file.try_clone()
+            .context("cloning fd")?;
+        SummaryIterator::iter(fd)
     }
 }
 

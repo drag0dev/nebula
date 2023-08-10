@@ -8,13 +8,13 @@ use crate::building_blocks::{Entry, BINCODE_OPTIONS};
 
 /// Iterator trait next function will continue reading where the file cursor is at
 /// if you need to go from the beginning call rewind()
-pub struct SSTableIteratorMultiFile<'a> {
-    sstable_file: &'a File,
+pub struct SSTableIteratorMultiFile {
+    sstable_file: File,
     pub (in crate::building_blocks::sstable) current_offset: u64,
 }
 
-impl<'a> SSTableIteratorMultiFile<'a> {
-    pub fn iter(file: &'a File) -> Self {
+impl SSTableIteratorMultiFile {
+    pub fn iter(file: File) -> Self {
         SSTableIteratorMultiFile { sstable_file: file, current_offset: 0 }
     }
 
@@ -35,7 +35,7 @@ impl<'a> SSTableIteratorMultiFile<'a> {
     }
 }
 
-impl Iterator for SSTableIteratorMultiFile<'_> {
+impl Iterator for SSTableIteratorMultiFile {
     type Item = Result<Entry>;
 
     fn next(&mut self) -> Option<Self::Item> {

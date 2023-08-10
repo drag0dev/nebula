@@ -4,13 +4,13 @@ use anyhow::{Result, Context, anyhow};
 use bincode::Options;
 use std::{fs::File, io::{Read, Seek, SeekFrom}};
 
-pub struct IndexIterator<'a> {
-    file: &'a File,
+pub struct IndexIterator {
+    file: File,
     pub (in crate::building_blocks::sstable) current_offset: u64,
 }
 
-impl<'a> IndexIterator<'a> {
-    pub fn iter(file: &'a File) -> Self {
+impl IndexIterator {
+    pub fn iter(file: File) -> Self {
         IndexIterator { file, current_offset: 0 }
     }
 
@@ -30,7 +30,7 @@ impl<'a> IndexIterator<'a> {
     }
 }
 
-impl Iterator for IndexIterator<'_> {
+impl Iterator for IndexIterator {
     type Item = Result<IndexEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
