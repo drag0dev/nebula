@@ -7,7 +7,7 @@ use anyhow::{Result, Context};
 /// two keys max len + 8bytes for offset
 pub static MAX_SUMMARY_ENTRY_LEN: u64 = 2 * MAX_KEY_LEN + 8;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SummaryEntry {
     pub first_key: Vec<u8>,
     pub last_key: Vec<u8>,
@@ -52,8 +52,8 @@ impl SummaryBuilder {
     /// otherwise summary won't be readable
     /// the total range of the summary in format: encoded entry + serialized length
     /// length last in order to be able to read from the back of the fail
-    pub fn total_range(&mut self, first_key: &Vec<u8>, last_key: &Vec<u8>, offset: u64) -> Result<()> {
-        let entry = SummaryEntry { first_key: first_key.clone(), last_key: last_key.clone(), offset };
+    pub fn total_range(&mut self, first_key: &Vec<u8>, last_key: &Vec<u8>) -> Result<()> {
+        let entry = SummaryEntry { first_key: first_key.clone(), last_key: last_key.clone(), offset: 0};
         let entry_ser = BINCODE_OPTIONS
             .serialize(&entry)
             .context("serializing summary entry")?;
