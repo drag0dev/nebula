@@ -49,7 +49,11 @@ impl SSTableReaderSingleFile {
     }
 
     pub fn summary_iter(&mut self) -> Result<(SummaryIterator, SummaryEntry)> {
-        todo!()
+        let mut fd = self.file.try_clone()
+            .context("cloning fd")?;
+        fd.seek(SeekFrom::Start(self.header.summary_offset))
+            .context("seeking to summary")?;
+        SummaryIterator::iter(fd)
     }
 
     pub fn read_filter(&mut self) -> Result<BloomFilter> {
