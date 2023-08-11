@@ -1,5 +1,6 @@
 use crate::building_blocks::{MAX_KEY_LEN, BINCODE_OPTIONS};
 use bincode::Options;
+use crc::{Crc, CRC_32_JAMCRC};
 use std::{fs::File, io::Write};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
@@ -34,6 +35,13 @@ impl SummaryBuilder {
             .serialize(&entry)
             .context("serializing summary entry")?;
 
+        let crc = Crc::<u32>::new(&CRC_32_JAMCRC)
+            .checksum(&entry_ser[..]);
+
+        let crc_ser = BINCODE_OPTIONS
+            .serialize(&crc)
+            .context("serializing crc for summary entry")?;
+
         let entry_len: u64 = entry_ser.len() as u64;
         let len_ser = BINCODE_OPTIONS
             .serialize(&entry_len)
@@ -41,6 +49,9 @@ impl SummaryBuilder {
 
         self.file.write_all(&len_ser[..])
             .context("writing summary entry len")?;
+
+        self.file.write(&crc_ser[..])
+            .context("writing summary entry crc")?;
 
         self.file.write_all(&entry_ser[..])
             .context("writing summary entry")?;
@@ -58,6 +69,13 @@ impl SummaryBuilder {
             .serialize(&entry)
             .context("serializing summary entry")?;
 
+        let crc = Crc::<u32>::new(&CRC_32_JAMCRC)
+            .checksum(&entry_ser[..]);
+
+        let crc_ser = BINCODE_OPTIONS
+            .serialize(&crc)
+            .context("serializing crc for summary entry")?;
+
         let entry_len: u64 = entry_ser.len() as u64;
         let len_ser = BINCODE_OPTIONS
             .serialize(&entry_len)
@@ -65,6 +83,9 @@ impl SummaryBuilder {
 
         self.file.write_all(&entry_ser[..])
             .context("writing summary entry")?;
+
+        self.file.write_all(&crc_ser[..])
+            .context("writing summary entry crc")?;
 
         self.file.write_all(&len_ser[..])
             .context("writing summary entry len")?;

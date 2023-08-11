@@ -1,14 +1,13 @@
-use crate::building_blocks::BINCODE_OPTIONS;
+use crate::building_blocks::{BINCODE_OPTIONS, MAX_KEY_LEN};
 use super::summary::MAX_SUMMARY_ENTRY_LEN;
 use anyhow::{Result, Context, anyhow};
 use bincode::Options;
+use crc::{Crc, CRC_32_JAMCRC};
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom}
 };
-
 use super::SummaryEntry;
-
 
 pub struct SummaryIterator {
     pub (in crate::building_blocks::sstable) file: File,
@@ -40,19 +39,40 @@ impl SummaryIterator {
     /// read the total range at the end of the file
     /// returns total range and file size without the it
     fn read_total_range(&mut self) -> Result<(SummaryEntry, i64)> {
-        let file_size = self.file.seek(SeekFrom::End(-8))
+        let file_size = self.file.seek(SeekFrom::End(-12))
             .context("seeking to the lenght of the total range")?;
+
+        let mut crc_ser = vec![0; 4];
+        self.file.read_exact(&mut crc_ser)
+            .context("reading crc of the total range")?;
+
+        let crc: u32 = BINCODE_OPTIONS
+            .deserialize(&crc_ser)
+            .context("deserializing crc of the total range")?;
 
         let mut len_ser = vec![0; 8];
         self.file.read_exact(&mut len_ser)
             .context("reading length of the total range")?;
         let len = deserialize_len(&len_ser[..])?;
 
-        self.file.seek(SeekFrom::End(-(8+len as i64)))
+        if len > MAX_KEY_LEN+8 {
+            let e = anyhow!("corrupted inedex entry len");
+            return Err(e);
+        }
+
+        self.file.seek(SeekFrom::End(-(12+len as i64)))
             .context("seeking to the total range")?;
         let mut entry_ser = vec![0; len as usize];
         self.file.read_exact(&mut entry_ser)
             .context("reading total range")?;
+
+        let computed_crc = Crc::<u32>::new(&CRC_32_JAMCRC)
+            .checksum(&entry_ser[..]);
+        if computed_crc != crc {
+            let e = anyhow!("crc does not match for global range")
+                .context("deserializing global range");
+            return Err(e);
+        }
 
         let entry = deserialize_entry(&entry_ser[..])?;
 
@@ -80,7 +100,6 @@ impl Iterator for SummaryIterator {
                 _ => Some(Err(res.context("reading summary entry len").err().unwrap()))
             };
         }
-        self.amount_read += 8;
 
         let len = deserialize_len(&len_ser[..]);
         if let Err(e) = len { return Some(Err(e)); }
@@ -91,10 +110,30 @@ impl Iterator for SummaryIterator {
             return Some(Err(e));
         }
 
+        let mut crc_ser = vec![0; 4];
+        let res = self.file.read_exact(&mut crc_ser);
+        if let Err(e) = res { return Some(Err(e.into())); }
+
+        let crc = BINCODE_OPTIONS
+            .deserialize(&crc_ser)
+            .context("deserializing crc for summary entry");
+        if let Err(e) = crc { return Some(Err(e)); }
+        let file_crc: u32 = crc.unwrap();
+
+        self.amount_read += 12;
+
         let mut entry_ser = vec![0; len as usize];
         let res = self.file.read_exact(&mut entry_ser)
             .context("reading summary entry");
         if let Err(e) = res { return Some(Err(e)) }
+
+        let computed_crc = Crc::<u32>::new(&CRC_32_JAMCRC)
+            .checksum(&entry_ser[..]);
+        if computed_crc != file_crc {
+            let e = anyhow!("crc does not match for summary entry")
+                .context("deserializing summary entry");
+            return Some(Err(e));
+        }
 
         let entry = deserialize_entry(&entry_ser[..]);
         if let Err(e) = entry { return Some(Err(e)); }

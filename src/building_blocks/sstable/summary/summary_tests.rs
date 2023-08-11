@@ -36,7 +36,7 @@ fn read_valid() {
 
     let mut index = 0;
     for entry in summary_iter {
-        assert!(entry.is_ok());
+        // assert!(entry.is_ok());
         let entry = entry.unwrap();
         assert_eq!(entry.first_key, index.to_string().into_bytes());
         assert_eq!(entry.last_key, (index+9).to_string().into_bytes());
@@ -49,8 +49,8 @@ fn read_valid() {
 fn read_invalid_entry() {
     let file = OpenOptions::new()
         .read(true)
-        .open("test-data/invalid-entry-summary-read")
-        .expect("error opening 'invalid-entry-summary-read'");
+        .open("test-data/invalid-summary-read")
+        .expect("error opening 'invalid-summary-read'");
 
     let (summary_iter, _) = SummaryIterator::iter(file).unwrap();
     let mut corrupted = false;
