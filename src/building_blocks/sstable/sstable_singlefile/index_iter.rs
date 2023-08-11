@@ -12,7 +12,8 @@ pub struct IndexIteratorSingleFile {
 impl IndexIteratorSingleFile {
     /// end offset is the offset at which index ends (summary starts)
     pub fn iter(file: File, start_offset: u64, end_offset: u64) -> Self {
-        let iter = IndexIterator::iter(file);
+        let mut iter = IndexIterator::iter(file);
+        iter.current_offset = start_offset;
         IndexIteratorSingleFile { start_offset, end_offset, iter }
     }
 
