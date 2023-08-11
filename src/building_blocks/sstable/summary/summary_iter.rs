@@ -11,14 +11,14 @@ use super::SummaryEntry;
 
 
 pub struct SummaryIterator {
-    file: File,
+    pub (in crate::building_blocks::sstable) file: File,
 
     /// number of bytes read so far
     amount_read: i64,
 
     /// number of bytes to be read in total
     /// file size - the total range size (the reverse range at the end of the file)
-    amount_to_be_read: i64,
+    pub (in crate::building_blocks::sstable) amount_to_be_read: i64,
 
 }
 
