@@ -21,6 +21,8 @@ lazy_static::lazy_static! {
 
 /// max lenth of the key is 64kb
 pub static MAX_KEY_LEN: u64 = 64*1024;
+/// max lenth of the key is 512mb
+pub static MAX_VAL_LEN: u64 = 512*1024*1024;
 
 mod entry;
 mod bloomfilter;
@@ -41,4 +43,5 @@ pub use sstable::{
     SummaryBuilder, SummaryEntry, SummaryIterator,
     SSTableConfig, FileOrganization,
     SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile,
+    SSTableBuilderSingleFile, SSTableReaderSingleFile, SSTableIteratorSingleFile
 };

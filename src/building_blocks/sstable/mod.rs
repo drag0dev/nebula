@@ -11,4 +11,14 @@ pub use summary::SummaryBuilder;
 pub use summary::SummaryEntry;
 pub use summary::SummaryIterator;
 pub use sstable_config::{SSTableConfig, FileOrganization};
-pub use sstable_multifile::{SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile};
+pub use sstable_multifile::{
+    SSTableBuilderMultiFile,
+    SSTableReaderMultiFile,
+    SSTableIteratorMultiFile
+};
+pub use sstable_singlefile::{
+    SSTableBuilderSingleFile,
+    SSTableReaderSingleFile,
+    SSTableIteratorSingleFile,
+    IndexIteratorSingleFile
+};
