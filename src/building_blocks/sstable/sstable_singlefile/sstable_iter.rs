@@ -12,7 +12,8 @@ pub struct SSTableIteratorSingleFile {
 impl SSTableIteratorSingleFile {
     /// end offset is the offset at which data ends (filter starts)
     pub fn iter(file: File, start_offset: u64, end_offset: u64) -> Self {
-        let iter = SSTableIteratorMultiFile::iter(file);
+        let mut iter = SSTableIteratorMultiFile::iter(file);
+        iter.current_offset = start_offset;
         SSTableIteratorSingleFile { start_offset, end_offset, iter }
     }
 
