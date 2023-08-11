@@ -11,7 +11,7 @@ pub struct SSTableReaderSingleFile {
     file: File,
 }
 
-/// each iter uses a new fd, therefore is safe to have multiple iterator iterate at the same time
+/// each iter uses a same fd, therefore it is not safe to have multiple iterator iterate at the same time
 impl SSTableReaderSingleFile {
     pub fn load(sstabel_dir: &str) -> Result<Self> {
         let file = OpenOptions::new()
@@ -32,7 +32,7 @@ impl SSTableReaderSingleFile {
         Ok(Self { header, file })
     }
 
-    pub fn iter(&mut self) -> Result<SSTableIteratorSingleFile> {
+    pub fn iter(&self) -> Result<SSTableIteratorSingleFile> {
         let mut fd = self.file.try_clone()
             .context("cloning fd")?;
         fd.seek(SeekFrom::Start(self.header.data_offset))
@@ -40,7 +40,7 @@ impl SSTableReaderSingleFile {
         Ok(SSTableIteratorSingleFile::iter(fd, self.header.data_offset, self.header.filter_offset))
     }
 
-    pub fn index_iter(&mut self) -> Result<IndexIteratorSingleFile> {
+    pub fn index_iter(&self) -> Result<IndexIteratorSingleFile> {
         let mut fd = self.file.try_clone()
             .context("cloning fd")?;
         fd.seek(SeekFrom::Start(self.header.index_offset))
@@ -48,15 +48,20 @@ impl SSTableReaderSingleFile {
         Ok(IndexIteratorSingleFile::iter(fd, self.header.index_offset, self.header.summary_offset))
     }
 
-    pub fn summary_iter(&mut self) -> Result<(SummaryIterator, SummaryEntry)> {
-        let mut fd = self.file.try_clone()
+    pub fn summary_iter(&self) -> Result<(SummaryIterator, SummaryEntry)> {
+        let fd = self.file.try_clone()
             .context("cloning fd")?;
-        fd.seek(SeekFrom::Start(self.header.summary_offset))
+        let (mut iter, range) = SummaryIterator::iter(fd)?;
+
+        // amount_to_be_read is set to filesize-totalrange, subtracting the summarty offset leaves
+        // the actual number of bytes to be read
+        iter.amount_to_be_read -= self.header.summary_offset as i64;
+        iter.file.seek(SeekFrom::Start(self.header.summary_offset))
             .context("seeking to summary")?;
-        SummaryIterator::iter(fd)
+        Ok((iter, range))
     }
 
-    pub fn read_filter(&mut self) -> Result<BloomFilter> {
+    pub fn read_filter(&self) -> Result<BloomFilter> {
         let mut fd = self.file.try_clone()
             .context("cloning fd")?;
         fd.seek(SeekFrom::Start(self.header.filter_offset))
