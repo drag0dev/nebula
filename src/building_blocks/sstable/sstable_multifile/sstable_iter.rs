@@ -1,10 +1,10 @@
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, anyhow};
 use bincode::Options;
 use std::{
     fs::File,
     io::{Seek, SeekFrom, Read}
 };
-use crate::building_blocks::{Entry, BINCODE_OPTIONS};
+use crate::building_blocks::{Entry, BINCODE_OPTIONS, MAX_KEY_LEN, MAX_VAL_LEN};
 
 /// Iterator trait next function will continue reading where the file cursor is at
 /// if you need to go from the beginning call rewind()
@@ -53,6 +53,11 @@ impl Iterator for SSTableIteratorMultiFile {
             .context("deserializing entry len");
         if let Err(e) = len { return Some(Err(e)); }
         let len: u64 = len.unwrap();
+
+        if len > (MAX_KEY_LEN+4+MAX_VAL_LEN) {
+            let e = anyhow!("corrupted entry len");
+            return Some(Err(e));
+        }
 
         // +4 for crc
         let mut entry_ser = vec![0; (len+4) as usize];
