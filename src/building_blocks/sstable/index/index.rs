@@ -47,4 +47,10 @@ impl IndexBuilder {
 
         Ok(old_offset)
     }
+
+    pub fn finish(&mut self) -> Result<()> {
+        self.file.flush()
+            .context("flushing the file")?;
+        Ok(())
+    }
 }

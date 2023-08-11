@@ -69,6 +69,8 @@ impl SummaryBuilder {
         self.file.write_all(&len_ser[..])
             .context("writing summary entry len")?;
 
+        self.file.flush()
+            .context("flushing summary to the file")?;
         Ok(())
     }
 }

@@ -15,7 +15,6 @@ use crate::building_blocks::{
 };
 
 // TODO: metadata
-// TODO: syncing file manually
 
 /// SSTable builder where aiding structures are in a separate files
 pub struct SSTableBuilderMultiFile {
@@ -135,6 +134,15 @@ impl SSTableBuilderMultiFile {
 
         self.filter.write_to_file(&mut self.filter_file)
             .context("writing filter to the file")?;
+
+        self.sstable_file.flush()
+            .context("flushing sstable to the file")?;
+
+        self.filter_file.flush()
+            .context("flushing filter to the file")?;
+
+        self.index.finish()?;
+
         Ok(())
     }
 
