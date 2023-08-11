@@ -17,9 +17,9 @@ fn writing() {
         let new_offset = index_builder.add(&i.to_string().into_bytes(), i)
             .expect("error adding index entry");
         assert_eq!(new_offset, offset);
-        offset += 25;
+        offset += 29;
     }
-    offset -= 25;
+    offset -= 29;
 
     // read by offsets
     let mut file = OpenOptions::new()

@@ -1,5 +1,6 @@
 use crate::building_blocks::BINCODE_OPTIONS;
 use bincode::Options;
+use crc::{CRC_32_JAMCRC, Crc};
 use std::{fs::File, io::Write};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
@@ -27,23 +28,36 @@ impl IndexBuilder {
         let entry = IndexEntry { key: key.clone(), offset };
         let entry_ser = BINCODE_OPTIONS
             .serialize(&entry)
-            .context("serializing entry")?;
+            .context("serializing index entry")?;
+
+        let crc = Crc::<u32>::new(&CRC_32_JAMCRC)
+            .checksum(&entry_ser[..]);
+
+        let crc_ser = BINCODE_OPTIONS
+            .serialize(&crc)
+            .context("serializing crc for index entry")?;
 
         let entry_len: u64 = entry_ser.len() as u64;
         let len_ser = BINCODE_OPTIONS
             .serialize(&entry_len)
-            .context("serializing entry len")?;
+            .context("serializing index entry len")?;
 
         self.file.write_all(&len_ser)
-            .context("writing entry len to the file")?;
+            .context("writing index entry len to the file")?;
+
+        self.file.write_all(&crc_ser)
+            .context("writing index entry crc to the file")?;
 
         self.file.write_all(&entry_ser)
-            .context("writing entry to the file")?;
+            .context("writing index entry to the file")?;
 
         let old_offset = self.index_offset;
 
         // offset moved by a single entry len
-        self.index_offset += len_ser.len() as u64 + entry_ser.len() as u64;
+        self.index_offset +=
+            len_ser.len() as u64 +
+            crc_ser.len() as u64 +
+            entry_ser.len() as u64;
 
         Ok(old_offset)
     }
