@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::{File, OpenOptions, create_dir},
     io::{Write, Seek, SeekFrom}, rc::Rc
 };
 use anyhow::{Result, Context};
@@ -35,11 +35,15 @@ pub struct SSTableBuilderSingleFile {
     filter: BloomFilter,
 
     /// last key written, used for generating summary
-    last_key_global: Option<Vec<u8>>
+    last_key_global: Option<Vec<u8>>,
+    summary_nth: u64,
 }
 
 impl SSTableBuilderSingleFile {
-    pub fn new(data_dir: &str, generation: &str, item_count: u64, filter_fp_prob: f64) -> Result<Self> {
+    pub fn new(data_dir: &str, generation: &str, item_count: u64, filter_fp_prob: f64, summary_nth: u64) -> Result<Self> {
+        create_dir(format!("{}/{}", data_dir, generation))
+            .context("creating the generation directory")?;
+
         let file_name = format!("{}/{}/data", data_dir, generation);
         let mut writer_file = OpenOptions::new()
             .create(true)
@@ -64,7 +68,7 @@ impl SSTableBuilderSingleFile {
 
         header.data_offset = header_ser.len() as u64;
 
-        Ok(Self { header, reader_file, writer_file, filter, file_name, last_key_global: None})
+        Ok(Self { header, reader_file, writer_file, filter, file_name, summary_nth, last_key_global: None})
     }
 
     pub fn insert_entry(&mut self, entry: &Entry) -> Result<()> {
@@ -101,10 +105,19 @@ impl SSTableBuilderSingleFile {
         self.writer_file.sync_all()
             .context("syncing the sstable file")?;
 
+        self.generate_index()
+            .context("generating the index")?;
+
+        self.generate_summary(self.summary_nth)
+            .context("generating the summary")?;
+
+        self.finish()
+            .context("finishing the sstable file")?;
+
         Ok(())
     }
 
-    pub fn generate_index(&mut self) -> Result<()> {
+    fn generate_index(&mut self) -> Result<()> {
         let index_offset = self.writer_file.stream_position()
             .context("getting current file position after writing the filter")?;
         self.header.index_offset = index_offset;
@@ -119,7 +132,7 @@ impl SSTableBuilderSingleFile {
         let reader_fd = self.reader_file.try_clone()
             .context("cloning the reader file fd for data")?;
 
-        let mut data_iter = SSTableIteratorSingleFile::iter(reader_fd, self.header.data_offset, self.header.index_offset);
+        let mut data_iter = SSTableIteratorSingleFile::iter(reader_fd, self.header.data_offset, self.header.filter_offset);
         let mut index_offset = 0;
         let mut next_entry;
 
@@ -132,7 +145,7 @@ impl SSTableBuilderSingleFile {
         loop {
             next_entry = data_iter.next();
             if next_entry.is_none() { break; }
-            entry = next_entry.unwrap().unwrap();
+            entry = next_entry.unwrap()?;
             index_builder.add(&entry.key, index_offset)
                 .context("adding index entry")?;
             index_offset = data_iter.iter.current_offset;
@@ -144,7 +157,7 @@ impl SSTableBuilderSingleFile {
         Ok(())
     }
 
-    pub fn generate_summary(&mut self, summary_nth: u64) -> Result<()> {
+    fn generate_summary(&mut self, summary_nth: u64) -> Result<()> {
         assert!(self.last_key_global.is_some());
         let summary_offset = self.writer_file.stream_position()
             .context("getting current file position after filter writing filter")?;
@@ -169,19 +182,21 @@ impl SSTableBuilderSingleFile {
         // keeps the last written entry
         let mut last_key_range = Rc::new(index_iter.next().expect("there is always atleast second entry")?);
         let mut counter = 2;
+        let mut current_range_offset = self.header.index_offset;
 
         while let Some(entry) = index_iter.next() {
             last_key_range = Rc::new(entry?);
             if first_key_range.is_none() { first_key_range = Some(Rc::clone(&last_key_range)); }
+            counter += 1;
             if counter % summary_nth == 0 {
-                summary_builder.add(&first_key_range.unwrap().key, &last_key_range.key, index_iter.iter.current_offset)?;
+                summary_builder.add(&first_key_range.unwrap().key, &last_key_range.key, current_range_offset)?;
+                current_range_offset = index_iter.iter.current_offset;
                 first_key_range = None;
             }
-            counter += 1;
         }
 
         if counter % summary_nth != 0 {
-            summary_builder.add(&first_key_range.as_ref().unwrap().key, &last_key_range.key, index_iter.iter.current_offset)?
+            summary_builder.add(&first_key_range.as_ref().unwrap().key, &last_key_range.key, current_range_offset)?
         }
 
         summary_builder.total_range(&first_key_global, &self.last_key_global.as_ref().unwrap())?;
@@ -192,7 +207,7 @@ impl SSTableBuilderSingleFile {
     }
 
     /// writes the sstable header
-    pub fn finish(&mut self) -> Result<()> {
+    fn finish(&mut self) -> Result<()> {
         self.writer_file.rewind()
             .context("rewiding sstable file")?;
 
