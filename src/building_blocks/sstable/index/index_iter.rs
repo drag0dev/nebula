@@ -67,7 +67,7 @@ impl Iterator for IndexIterator {
             .context("deserializing entry");
         if let Err(e) = entry { return Some(Err(e)); }
 
-        self.current_offset = 8+len;
+        self.current_offset += 8+len;
         Some(entry)
     }
 }
