@@ -1,4 +1,7 @@
-use std::{fs::OpenOptions, io::Seek};
+use std::{
+    fs::OpenOptions,
+    io::Seek
+};
 use super::{IndexBuilder, IndexIterator};
 
 #[test]

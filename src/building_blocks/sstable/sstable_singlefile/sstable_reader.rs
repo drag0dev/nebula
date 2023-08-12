@@ -53,7 +53,7 @@ impl SSTableReaderSingleFile {
             .context("cloning fd")?;
         let (mut iter, range) = SummaryIterator::iter(fd)?;
 
-        // amount_to_be_read is set to filesize-totalrange, subtracting the summarty offset leaves
+        // amount_to_be_read is set to filesize-totalrange, subtracting the summary offset leaves
         // the actual number of bytes to be read
         iter.amount_to_be_read -= self.header.summary_offset as i64;
         iter.file.seek(SeekFrom::Start(self.header.summary_offset))

@@ -14,8 +14,6 @@ use crate::building_blocks::{
     Entry, BloomFilter
 };
 
-// TODO: metadata
-
 /// SSTable builder where aiding structures are in a separate files
 pub struct SSTableBuilderMultiFile {
     index: IndexBuilder,
@@ -87,7 +85,7 @@ impl SSTableBuilderMultiFile {
         }
 
         self.sstable_file.write_all(&entry_ser)
-            .context("writign entry into the sstable file")?;
+            .context("writing entry into the sstable file")?;
 
         self.filter.add(&entry.key)?;
 
@@ -156,20 +154,4 @@ fn create_file(dir: &str, file_name: &str) -> Result<File> {
         .open(format!("{}/{}", dir, file_name))
         .context("creating sstable file")?;
     Ok(file)
-}
-
-fn range_summary(summary: &mut SummaryBuilder, first: &MemtableEntry, last: &MemtableEntry) -> Result<()> {
-    let first_key = memtable_entry_key_to_vec(first);
-    let last_key = memtable_entry_key_to_vec(last);
-    summary.add(&first_key, &last_key, 0)
-        .context("adding range to summary")?;
-    Ok(())
-}
-
-fn memtable_entry_key_to_vec(entry: &MemtableEntry) -> Vec<u8> {
-    entry
-        .key
-        .chars()
-        .map(|c| c as u8)
-        .collect::<Vec<u8>>()
 }

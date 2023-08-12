@@ -1,13 +1,11 @@
-use anyhow::{Result, Context, anyhow};
-use bincode::Options;
 use std::{
     fs::File,
     io::{Seek, SeekFrom, Read}
 };
+use anyhow::{Result, Context, anyhow};
+use bincode::Options;
 use crate::building_blocks::{Entry, BINCODE_OPTIONS, MAX_KEY_LEN, MAX_VAL_LEN};
 
-/// Iterator trait next function will continue reading where the file cursor is at
-/// if you need to go from the beginning call rewind()
 pub struct SSTableIteratorMultiFile {
     sstable_file: File,
     pub (in crate::building_blocks::sstable) current_offset: u64,

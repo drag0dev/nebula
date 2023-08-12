@@ -1,13 +1,12 @@
-use crate::building_blocks::{BINCODE_OPTIONS, MAX_KEY_LEN};
-use super::summary::MAX_SUMMARY_ENTRY_LEN;
-use anyhow::{Result, Context, anyhow};
-use bincode::Options;
-use crc::{Crc, CRC_32_JAMCRC};
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom}
 };
-use super::SummaryEntry;
+use anyhow::{Result, Context, anyhow};
+use bincode::Options;
+use crc::{Crc, CRC_32_JAMCRC};
+use super::{SummaryEntry, MAX_SUMMARY_ENTRY_LEN};
+use crate::building_blocks::{BINCODE_OPTIONS, MAX_KEY_LEN};
 
 pub struct SummaryIterator {
     pub (in crate::building_blocks::sstable) file: File,
@@ -16,7 +15,6 @@ pub struct SummaryIterator {
     amount_read: i64,
 
     /// number of bytes to be read in total
-    /// file size - the total range size (the reverse range at the end of the file)
     pub (in crate::building_blocks::sstable) amount_to_be_read: i64,
 
 }

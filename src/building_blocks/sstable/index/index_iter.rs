@@ -1,9 +1,12 @@
-use crate::building_blocks::{BINCODE_OPTIONS, MAX_KEY_LEN};
-use super::IndexEntry;
+use std::{
+    fs::File,
+    io::{Read, Seek, SeekFrom}
+};
 use anyhow::{Result, Context, anyhow};
 use bincode::Options;
 use crc::{Crc, CRC_32_JAMCRC};
-use std::{fs::File, io::{Read, Seek, SeekFrom}};
+use crate::building_blocks::{BINCODE_OPTIONS, MAX_KEY_LEN};
+use super::IndexEntry;
 
 pub struct IndexIterator {
     file: File,
@@ -54,7 +57,7 @@ impl Iterator for IndexIterator {
 
         // 64kb at most for the key and 8 bytes more for offset
         if len > MAX_KEY_LEN+8 {
-            let e = anyhow!("corrupted inedex entry len");
+            let e = anyhow!("corrupted index entry len");
             return Some(Err(e));
         }
 
@@ -84,7 +87,7 @@ impl Iterator for IndexIterator {
 
         let entry = BINCODE_OPTIONS
             .deserialize(&entry_ser)
-            .context("deserializing entry");
+            .context("deserializing index entry");
         if let Err(e) = entry { return Some(Err(e)); }
 
         self.current_offset += 12 + len;

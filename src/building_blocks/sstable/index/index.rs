@@ -1,9 +1,12 @@
-use crate::building_blocks::BINCODE_OPTIONS;
+use std::{
+    fs::File,
+    io::Write
+};
 use bincode::Options;
 use crc::{CRC_32_JAMCRC, Crc};
-use std::{fs::File, io::Write};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
+use crate::building_blocks::BINCODE_OPTIONS;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IndexEntry {
@@ -12,10 +15,11 @@ pub struct IndexEntry {
 }
 
 /// every entry is individually encoded
-/// each entry is written in format: serialized length + encoded entry
-/// offset tracks at which offset each index entry is written
+/// each entry is written in format: serialized length(8b) + crc(4b) + encoded entry
 pub struct IndexBuilder {
     file: File,
+
+    /// tracks at which offset each index entry is written
     index_offset: u64,
 }
 
@@ -64,7 +68,7 @@ impl IndexBuilder {
 
     pub fn finish(&mut self) -> Result<()> {
         self.file.flush()
-            .context("flushing the file")?;
+            .context("flushing index file")?;
         Ok(())
     }
 }

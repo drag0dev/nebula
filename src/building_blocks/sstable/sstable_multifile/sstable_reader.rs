@@ -1,5 +1,5 @@
-use anyhow::{Result, Context};
 use std::fs::{File, OpenOptions};
+use anyhow::{Result, Context};
 use super::SSTableIteratorMultiFile;
 use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, BloomFilter};
 
@@ -38,20 +38,20 @@ impl SSTableReaderMultiFile {
 
     pub fn iter(&self) -> Result<SSTableIteratorMultiFile> {
         let fd = self.sstable_file.try_clone()
-            .context("cloning fd")?;
+            .context("cloning fd for sstable iter")?;
         Ok(SSTableIteratorMultiFile::iter(fd))
     }
 
     pub fn index_iter(&self) -> Result<IndexIterator> {
         let fd = self.index_file.try_clone()
-            .context("cloning fd")?;
+            .context("cloning fd for index iter")?;
         Ok(IndexIterator::iter(fd))
     }
 
     /// returns the iterator and the global range
     pub fn summary_iter(&self) -> Result<(SummaryIterator, SummaryEntry)> {
         let fd = self.summary_file.try_clone()
-            .context("cloning fd")?;
+            .context("cloning fd for summary iter")?;
         SummaryIterator::iter(fd)
     }
 }

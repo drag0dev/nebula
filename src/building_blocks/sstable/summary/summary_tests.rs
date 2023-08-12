@@ -36,7 +36,7 @@ fn read_valid() {
 
     let mut index = 0;
     for entry in summary_iter {
-        // assert!(entry.is_ok());
+        assert!(entry.is_ok());
         let entry = entry.unwrap();
         assert_eq!(entry.first_key, index.to_string().into_bytes());
         assert_eq!(entry.last_key, (index+9).to_string().into_bytes());

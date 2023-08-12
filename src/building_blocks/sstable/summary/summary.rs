@@ -1,9 +1,12 @@
-use crate::building_blocks::{MAX_KEY_LEN, BINCODE_OPTIONS};
+use std::{
+    fs::File,
+    io::Write
+};
 use bincode::Options;
 use crc::{Crc, CRC_32_JAMCRC};
-use std::{fs::File, io::Write};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
+use crate::building_blocks::{MAX_KEY_LEN, BINCODE_OPTIONS};
 
 /// two keys max len + 8bytes for offset
 pub static MAX_SUMMARY_ENTRY_LEN: u64 = 2 * MAX_KEY_LEN + 8;
@@ -16,9 +19,8 @@ pub struct SummaryEntry {
 }
 
 /// every entry is individually encoded
-/// each entry is written in format: serialized length + encoded entry
-/// first summary entry is the last and the first key of the index, so 'footer' is
-/// actually at the beginning
+/// each entry is written in format: serialized length(8b) + crc(4b) + encoded entry
+/// total range of the keys is written at the end, in the format: encoded_entry + crc(4b) + serialized len(8b)
 pub struct SummaryBuilder {
     file: File,
 }
@@ -28,7 +30,6 @@ impl SummaryBuilder {
         SummaryBuilder { file }
     }
 
-    /// each entry is written in format: serialized length + encoded entry
     pub fn add(&mut self, first_key: &Vec<u8>, last_key: &Vec<u8>, offset: u64) -> Result<()> {
         let entry = SummaryEntry { first_key: first_key.clone(), last_key: last_key.clone(), offset };
         let entry_ser = BINCODE_OPTIONS
@@ -61,7 +62,6 @@ impl SummaryBuilder {
 
     /// this method is expected to be called at the end and no more entries are expected to be written,
     /// otherwise summary won't be readable
-    /// the total range of the summary in format: encoded entry + serialized length
     /// length last in order to be able to read from the back of the fail
     pub fn total_range(&mut self, first_key: &Vec<u8>, last_key: &Vec<u8>) -> Result<()> {
         let entry = SummaryEntry { first_key: first_key.clone(), last_key: last_key.clone(), offset: 0};

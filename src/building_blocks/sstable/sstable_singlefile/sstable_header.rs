@@ -5,7 +5,7 @@ use crate::building_blocks::BINCODE_OPTIONS;
 
 pub static HEADER_SIZE: u64 = 32;
 
-/// all the offsets are the offsets from the beginning from the file not including the filter
+/// all the offsets are the offsets from the beginning from the file including the header
 /// itself
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SSTableHeader {

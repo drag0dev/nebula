@@ -31,7 +31,6 @@ pub struct SSTableBuilderSingleFile {
     /// used for writing to the file, synced after each pass
     writer_file: File,
 
-    file_name: String,
     filter: BloomFilter,
 
     /// last key written, used for generating summary
@@ -68,7 +67,7 @@ impl SSTableBuilderSingleFile {
 
         header.data_offset = header_ser.len() as u64;
 
-        Ok(Self { header, reader_file, writer_file, filter, file_name, summary_nth, last_key_global: None})
+        Ok(Self { header, reader_file, writer_file, filter, summary_nth, last_key_global: None})
     }
 
     pub fn insert_entry(&mut self, entry: &Entry) -> Result<()> {
@@ -196,6 +195,7 @@ impl SSTableBuilderSingleFile {
         }
 
         if counter % summary_nth != 0 {
+            assert!(first_key_range.is_some());
             summary_builder.add(&first_key_range.as_ref().unwrap().key, &last_key_range.key, current_range_offset)?
         }
 
