@@ -1,26 +1,38 @@
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, stdout, Write, Stdin, Stdout};
 use anyhow::{Result, Context};
 use clap::Parser;
 use super::Repl;
 
-pub fn repl() -> Result<Repl> {
-    let stdin = stdin();
-    let mut stdout = stdout();
-    let mut buff = String::new();
-    loop {
-        print!(">> ");
-        stdout.flush()
-            .context("flushing prompt to stdout")?;
+pub struct REPL {
+    stdin: Stdin,
+    stdout: Stdout,
+}
 
-        buff.clear();
-        stdin.read_line(&mut buff)
-            .context("reading user input")?;
+impl REPL {
+    pub fn new() -> Self {
+        REPL {
+            stdin: stdin(),
+            stdout: stdout(),
+        }
+    }
 
-        let query = parse_from_str(&buff);
-        if let Err(e) = query {
-            println!("{}", e);
-        } else {
-            return Ok(query.unwrap())
+    pub fn get_query(&mut self) -> Result<Repl> {
+        let mut buff = String::new();
+        loop {
+            print!(">> ");
+            self.stdout.flush()
+                .context("flushing prompt to stdout")?;
+
+            buff.clear();
+            self.stdin.read_line(&mut buff)
+                .context("reading user input")?;
+
+            let query = parse_from_str(&buff);
+            if let Err(e) = query {
+                println!("{}", e);
+            } else {
+                return Ok(query.unwrap())
+            }
         }
     }
 }

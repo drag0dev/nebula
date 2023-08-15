@@ -7,4 +7,5 @@ pub use commands::BloomFilterCommands;
 pub use commands::SimHashCommands;
 pub use commands::HLLCommands;
 pub use commands::CMSCommands;
-pub use parser::repl;
+pub use parser::REPL;
+pub use parser::parse_from_str;
