@@ -30,6 +30,7 @@ mod hyperloglog;
 mod count_min_sketch;
 mod memtable;
 mod sstable;
+mod skip_list;
 
 pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
@@ -45,3 +46,5 @@ pub use sstable::{
     SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile,
     SSTableBuilderSingleFile, SSTableReaderSingleFile, SSTableIteratorSingleFile
 };
+pub use skip_list::SkipList;
+pub use skip_list::SkipListNode;
