@@ -15,15 +15,19 @@ pub fn repl() -> Result<Repl> {
         stdin.read_line(&mut buff)
             .context("reading user input")?;
 
-        let mut command = vec![""];
-        command.extend(buff
-                .split(' ')
-                .map(|p| p.trim()));
-        let query = Repl::try_parse_from(command);
+        let query = parse_from_str(&buff);
         if let Err(e) = query {
             println!("{}", e);
         } else {
             return Ok(query.unwrap())
         }
     }
+}
+
+pub fn parse_from_str(input: &str) -> Result<Repl> {
+    let mut command = vec![""];
+    command.extend(input
+            .split(' ')
+            .map(|p| p.trim()));
+    Ok(Repl::try_parse_from(command)?)
 }
