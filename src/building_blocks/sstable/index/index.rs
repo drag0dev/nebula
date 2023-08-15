@@ -20,7 +20,7 @@ pub struct IndexBuilder {
     file: File,
 
     /// tracks at which offset each index entry is written
-    index_offset: u64,
+    pub (in crate::building_blocks::sstable) index_offset: u64,
 }
 
 impl IndexBuilder {

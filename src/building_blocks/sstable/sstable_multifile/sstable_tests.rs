@@ -63,7 +63,7 @@ fn read_valid_sstable_multifile() {
     index_iter.move_iter(random_entry_summary.offset).expect("moving index iter");
 
     let index_entry = index_iter.next().unwrap().expect("reading random index entry");
-    assert_eq!(index_entry.key, 49.to_string().into_bytes());
+    assert_eq!(index_entry.key, 50.to_string().into_bytes());
 
     // test filter
     for i in 0..100 {

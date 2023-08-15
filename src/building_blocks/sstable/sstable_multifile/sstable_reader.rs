@@ -1,4 +1,7 @@
-use std::fs::{File, OpenOptions};
+use std::{
+    fs::{File, OpenOptions},
+    io::Seek
+};
 use anyhow::{Result, Context};
 use super::SSTableIteratorMultiFile;
 use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, BloomFilter};
@@ -37,21 +40,24 @@ impl SSTableReaderMultiFile {
     }
 
     pub fn iter(&self) -> Result<SSTableIteratorMultiFile> {
-        let fd = self.sstable_file.try_clone()
-            .context("cloning fd for sstable iter")?;
+        let mut fd = self.sstable_file.try_clone()
+            .context("cloning data fd for sstable iter")?;
+        fd.rewind().context("rewinding data fd for sstable iter")?;
         Ok(SSTableIteratorMultiFile::iter(fd))
     }
 
     pub fn index_iter(&self) -> Result<IndexIterator> {
-        let fd = self.index_file.try_clone()
-            .context("cloning fd for index iter")?;
+        let mut fd = self.index_file.try_clone()
+            .context("cloning index fd for index iter")?;
+        fd.rewind().context("rewinding index fd for index iter")?;
         Ok(IndexIterator::iter(fd))
     }
 
     /// returns the iterator and the global range
     pub fn summary_iter(&self) -> Result<(SummaryIterator, SummaryEntry)> {
-        let fd = self.summary_file.try_clone()
-            .context("cloning fd for summary iter")?;
+        let mut fd = self.summary_file.try_clone()
+            .context("cloning summary fd for summary iter")?;
+        fd.rewind().context("rewinding summary fd for summary iter")?;
         SummaryIterator::iter(fd)
     }
 }

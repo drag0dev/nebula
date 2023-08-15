@@ -24,7 +24,6 @@ pub struct SSTableBuilderMultiFile {
     sstable_file: File,
     sstable_offset: u64,
     summary_offset: u64,
-    index_offset: u64,
     summary_nth: u64,
     entries_written: u64,
 
@@ -65,7 +64,6 @@ impl SSTableBuilderMultiFile {
             sstable_file,
             sstable_offset: 0,
             summary_offset: 0,
-            index_offset: 0,
             summary_nth,
             entries_written: 0,
             first_entry_range: None,
@@ -89,7 +87,7 @@ impl SSTableBuilderMultiFile {
 
         self.filter.add(&entry.key)?;
 
-        self.index_offset = self.index.add(&entry.key, self.sstable_offset)
+        self.index.add(&entry.key, self.sstable_offset)
             .context("adding index entry")?;
 
         self.sstable_offset += entry_ser.len() as u64;
@@ -107,7 +105,7 @@ impl SSTableBuilderMultiFile {
                 self.summary_offset)
                 .context("adding summary entry")?;
             self.first_entry_range = None;
-            self.summary_offset = self.index_offset;
+            self.summary_offset = self.index.index_offset;
         }
 
         Ok(())
@@ -116,7 +114,7 @@ impl SSTableBuilderMultiFile {
     /// write the last incomplete entry in the summary and the total range
     /// flush the filter to the file
     pub fn finish(&mut self) -> Result<()> {
-        if self.summary_offset != self.index_offset {
+        if self.summary_offset != self.index.index_offset {
             assert!(self.first_entry_range.is_some());
             self.summary.add(
                 &self.first_entry_range.as_ref().unwrap().key,
