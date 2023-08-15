@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 // BloomFilter - bf_
 // HLL - hll_
 // CMS - cms_
-// when putting a special structure its expected to be in binary repr that respects global
+// when putting a special structure its expected to be in hexadecimal repr that respects global
 // bincode ser/deser options
 #[derive(Debug, Parser)]
 #[command(name = "")]

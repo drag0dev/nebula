@@ -11,6 +11,7 @@ pub fn repl() -> Result<Repl> {
         print!(">> ");
         stdout.flush()
             .context("flushing prompt to stdout")?;
+
         buff.clear();
         stdin.read_line(&mut buff)
             .context("reading user input")?;
