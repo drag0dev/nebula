@@ -19,7 +19,6 @@ pub enum Commands {
     Put { key: String, value: String },
     Delete { key: String },
 
-    #[command(arg_required_else_help = true)]
     List {
         key_prefix: String,
 
