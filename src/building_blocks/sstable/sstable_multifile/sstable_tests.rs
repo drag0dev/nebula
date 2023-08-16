@@ -1,8 +1,12 @@
+use std::{path::Path, fs::remove_dir_all};
 use crate::building_blocks::{MemtableEntry, Entry};
 use super::{SSTableBuilderMultiFile, SSTableReaderMultiFile};
 
 #[test]
 fn write_sstable_multifile() {
+    let exists = Path::new("./test-data/write-sstable-multifile").is_dir();
+    if exists { remove_dir_all("./test-data/write-sstable-multifile").expect("removing old writen sstable"); }
+
     let mut sstable = SSTableBuilderMultiFile::new("test-data", "write-sstable-multifile", 100, 0.1, 10)
         .expect("creating a sstable");
 

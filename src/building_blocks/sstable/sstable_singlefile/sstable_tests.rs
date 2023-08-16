@@ -1,8 +1,12 @@
+use std::{path::Path, fs::remove_dir_all};
 use crate::building_blocks::Entry;
 use super::{SSTableReaderSingleFile, sstable_builder::SSTableBuilderSingleFile};
 
 #[test]
 fn write_sstable_singlefile() {
+    let exists = Path::new("./test-data/write-sstable-singlefile").is_dir();
+    if exists { remove_dir_all("./test-data/write-sstable-singlefile").expect("removing old writen sstable"); }
+
     let mut sstable = SSTableBuilderSingleFile::new("test-data", "write-sstable-singlefile", 100, 0.1, 10)
         .expect("creating a sstable");
 
