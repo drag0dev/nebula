@@ -27,7 +27,8 @@ fn main() {
 }
 
 fn print_err(e: Error) {
-    for (i, small_e) in e.chain().enumerate() {
+    println!("error: {}", e);
+    for (i, small_e) in e.chain().enumerate().skip(1) {
         println!("{}{small_e}", "\t".repeat(i));
     }
 }

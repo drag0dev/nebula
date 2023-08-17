@@ -101,8 +101,8 @@ fn generate_data_summary() -> Result<()> {
 
     let mut summary_builder = SummaryBuilder::new(valid_file.try_clone().unwrap());
     for i in (0..100).step_by(10) {
-        (summary_builder.add(&i.to_string().into_bytes(), &(i+9).to_string().into_bytes(), i*10)
-         .context("adding summary entry")?);
+        summary_builder.add(&i.to_string().into_bytes(), &(i+9).to_string().into_bytes(), i*10)
+         .context("adding summary entry")?;
     }
     summary_builder.total_range(&"0".to_string().into_bytes(), &"99".to_string().into_bytes())
         .context("adding total range")?;
