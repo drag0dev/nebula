@@ -92,8 +92,3 @@ impl StorageCRUD for BTree<String, Rc<RefCell<MemtableEntry>>> {
             .collect::<Vec<Rc<RefCell<MemtableEntry>>>>()
     }
 }
-
-#[test]
-pub fn tree() {
-    assert_ne!(2 + 2, 5);
-}
