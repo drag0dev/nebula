@@ -2,6 +2,8 @@ use std::{
     cell::RefCell,
     rc::Rc
 };
+use crate::building_blocks::BTree;
+
 use super::{
     Memtable,
     MemtableEntry,
@@ -61,7 +63,7 @@ impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
 
 #[test]
 fn create() {
-    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
     let mut memtable = Memtable::new(items, 256);
 
     assert!(memtable.read("0".to_string()).is_none());
@@ -78,7 +80,7 @@ fn create() {
 
 #[test]
 fn update() {
-    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
     let mut memtable = Memtable::new(items, 256);
 
     let mut entry = MemtableEntry::new(0, "0".to_string(), Some("0".to_string()));
@@ -94,7 +96,7 @@ fn update() {
 
 #[test]
 fn delete() {
-    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
     let mut memtable = Memtable::new(items, 256);
 
     assert!(memtable.read("0".to_string()).is_none());
@@ -119,7 +121,7 @@ fn delete() {
 
 #[test]
 fn prefix_scan() {
-    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
     let mut memtable = Memtable::new(items, 256);
 
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
@@ -150,7 +152,7 @@ fn prefix_scan() {
 
 #[test]
 fn range_scan() {
-    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
     let mut memtable = Memtable::new(items, 256);
 
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
@@ -177,7 +179,7 @@ fn range_scan() {
 
 #[test]
 fn len() {
-    let items: Vec<Rc<RefCell<MemtableEntry>>> = Vec::new();
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
     let mut memtable = Memtable::new(items, 256);
 
     // create
