@@ -3,7 +3,7 @@ use std::{
     io::{Seek, Write, Read}, path::Path
 };
 use anyhow::{Result, Context};
-use crate::building_blocks::{BloomFilter, IndexBuilder, SummaryBuilder, SSTableBuilderMultiFile, MemtableEntry, SSTableBuilderSingleFile};
+use crate::building_blocks::{BloomFilter, IndexBuilder, SummaryBuilder, SSTableBuilderMultiFile, SSTableBuilderSingleFile, Entry};
 
 pub fn generate_test_data() -> Result<()> {
     generate_dir()?;
@@ -140,14 +140,14 @@ fn generate_sstable_multifile() -> Result<()> {
         .context("creating the invalid sstable")?;
 
     for i in 0..100 {
-        let entry = MemtableEntry {
-            key: i.to_string(),
-            value: Some(i.to_string()),
+        let entry = Entry {
+            key: i.to_string().into_bytes(),
+            value: Some(i.to_string().into_bytes()),
             timestamp: i,
         };
-        sstable_valid.insert(&entry)
+        sstable_valid.insert(entry.clone())
             .context("inserting entry into the valid sstable")?;
-        sstable_invalid.insert(&entry)
+        sstable_invalid.insert(entry)
             .context("inserting entry into the invalid sstable")?;
     }
     sstable_valid.finish().expect("finishing valid sstable");
@@ -184,14 +184,14 @@ fn generate_sstable_singlefile() -> Result<()> {
         .context("creating the invalid sstable")?;
 
     for i in 0..100 {
-        let entry = MemtableEntry {
-            key: i.to_string(),
-            value: Some(i.to_string()),
+        let entry = Entry {
+            key: i.to_string().into_bytes(),
+            value: Some(i.to_string().into_bytes()),
             timestamp: i,
         };
-        sstable_valid.insert_memtable_entry(&entry)
+        sstable_valid.insert(entry.clone())
             .context("inserting entry into the valid sstable")?;
-        sstable_invalid.insert_memtable_entry(&entry)
+        sstable_invalid.insert(entry)
             .context("inserting entry into the invalid sstable")?;
     }
     sstable_valid.finish_data().expect("finishing valid sstable");

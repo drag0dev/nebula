@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Result, Context};
 use crate::building_blocks::{
     SummaryBuilder,
-    IndexBuilder, MemtableEntry,
+    IndexBuilder,
     Entry, BloomFilter
 };
 
@@ -72,9 +72,9 @@ impl SSTableBuilderMultiFile {
         })
     }
 
-    pub fn insert(&mut self, entry: &MemtableEntry) -> Result<()> {
+    pub fn insert(&mut self, entry: Entry) -> Result<()> {
         self.entries_written += 1;
-        let entry = Rc::new(Entry::from(entry));
+        let entry = Rc::new(entry);
         let entry_ser = entry.serialize()?;
 
         // only happens once
