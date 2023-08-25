@@ -10,6 +10,7 @@ pub struct SSTableConfig {
     filter_fp_prob: f64,
 }
 
+#[derive(PartialEq)]
 pub enum FileOrganization {
     SingleFile,
     MultipleFiles,

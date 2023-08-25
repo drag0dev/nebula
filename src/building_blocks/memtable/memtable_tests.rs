@@ -1,8 +1,8 @@
 use std::{
     cell::RefCell,
-    rc::Rc
+    rc::Rc, path::Path, fs::remove_dir_all
 };
-use crate::building_blocks::BTree;
+use crate::building_blocks::{BTree, FileOrganization};
 
 use super::{
     Memtable,
@@ -10,7 +10,6 @@ use super::{
     StorageCRUD
 };
 
-// TODO: only used for testing till skiplist/btree is implemented
 impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
     fn create(&mut self, item: MemtableEntry) {
         let res = self.iter().find(|entry| entry.borrow().key == item.key);
@@ -64,7 +63,7 @@ impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
 #[test]
 fn create() {
     let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-    let mut memtable = Memtable::new(items, 256);
+    let mut memtable = Memtable::new(items, 256, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
 
     assert!(memtable.read("0".to_string()).is_none());
 
@@ -81,7 +80,7 @@ fn create() {
 #[test]
 fn update() {
     let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-    let mut memtable = Memtable::new(items, 256);
+    let mut memtable = Memtable::new(items, 256, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
 
     let mut entry = MemtableEntry::new(0, "0".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
@@ -97,7 +96,7 @@ fn update() {
 #[test]
 fn delete() {
     let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-    let mut memtable = Memtable::new(items, 256);
+    let mut memtable = Memtable::new(items, 256, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
 
     assert!(memtable.read("0".to_string()).is_none());
 
@@ -122,7 +121,7 @@ fn delete() {
 #[test]
 fn prefix_scan() {
     let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-    let mut memtable = Memtable::new(items, 256);
+    let mut memtable = Memtable::new(items, 256, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
 
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
@@ -153,7 +152,7 @@ fn prefix_scan() {
 #[test]
 fn range_scan() {
     let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-    let mut memtable = Memtable::new(items, 256);
+    let mut memtable = Memtable::new(items, 256, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
 
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
@@ -180,20 +179,37 @@ fn range_scan() {
 #[test]
 fn len() {
     let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-    let mut memtable = Memtable::new(items, 256);
+    let mut memtable = Memtable::new(items, 256, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
 
     // create
     let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
     memtable.create(entry.clone());
-    assert_eq!(memtable.len, 21);
+    assert_eq!(memtable.len, 1);
 
     // delete
     entry.value = None;
     memtable.delete(entry.clone());
-    assert_eq!(memtable.len, 41);
+    assert_eq!(memtable.len, 2);
 
     // update
     entry.value = Some("123".into());
     memtable.delete(entry);
-    assert_eq!(memtable.len, 64);
+    assert_eq!(memtable.len, 3);
+}
+
+#[test]
+fn flushing() {
+    let exists = Path::new("./test-data/memtable").is_dir();
+    if exists { remove_dir_all("./test-data/memtable").expect("removing old writen memtable"); }
+
+    let items: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
+    let mut memtable = Memtable::new(items, 2, FileOrganization::SingleFile, 0.01, 50, "test-data/".into());
+
+    let mut entry = MemtableEntry::new(0, "aabc".to_string(), Some("0".to_string()));
+    memtable.create(entry.clone());
+    entry.key = "aaaa".into();
+    let res = memtable.create(entry);
+
+    assert!(res.is_some());
+    assert!(res.unwrap().is_ok());
 }
