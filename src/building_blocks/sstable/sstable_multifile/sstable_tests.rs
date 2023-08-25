@@ -1,5 +1,5 @@
 use std::{path::Path, fs::remove_dir_all};
-use crate::building_blocks::{MemtableEntry, Entry};
+use crate::building_blocks::Entry;
 use super::{SSTableBuilderMultiFile, SSTableReaderMultiFile};
 
 #[test]
@@ -11,12 +11,12 @@ fn write_sstable_multifile() {
         .expect("creating a sstable");
 
     for i in 0..100 {
-        let entry = MemtableEntry {
-            key: i.to_string(),
-            value: Some(i.to_string()),
+        let entry = Entry {
+            key: i.to_string().into_bytes(),
+            value: Some(i.to_string().into_bytes()),
             timestamp: i,
         };
-        sstable.insert(&entry).expect("inserting entry into the sstable");
+        sstable.insert(entry).expect("inserting entry into the sstable");
     }
     sstable.finish().expect("finishing sstable");
 }

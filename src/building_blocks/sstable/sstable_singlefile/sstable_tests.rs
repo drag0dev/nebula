@@ -17,7 +17,7 @@ fn write_sstable_singlefile() {
             value: Some(i.to_string().into_bytes()),
         };
 
-        sstable.insert_entry(&entry).expect("inserting entry into the sstable");
+        sstable.insert(entry).expect("inserting entry into the sstable");
     }
 
     sstable.finish_data().expect("finishing sstable");
