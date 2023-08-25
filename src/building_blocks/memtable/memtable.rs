@@ -7,7 +7,7 @@ use super::{
 
 /// memetable flushes to the disk only when the amount of data inside memtable
 /// is greater or equal to capacity, in order to avoid checking multiple times for one action
-/// create, upadte and delete return the path to the new sstable if flush happened
+/// create, update and delete return the path to the new sstable if flush happened
 /// sstable created when flushing memtable is always called "memtable"
 pub struct Memtable <S>
 where

@@ -10,7 +10,6 @@ use super::{
     StorageCRUD
 };
 
-// NOTE: only used for testing till skiplist/btree is implemented
 impl StorageCRUD for Vec<Rc<RefCell<MemtableEntry>>> {
     fn create(&mut self, item: MemtableEntry) {
         let res = self.iter().find(|entry| entry.borrow().key == item.key);
