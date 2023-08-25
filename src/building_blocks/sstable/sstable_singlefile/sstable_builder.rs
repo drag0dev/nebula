@@ -70,16 +70,11 @@ impl SSTableBuilderSingleFile {
         Ok(Self { header, reader_file, writer_file, filter, summary_nth, last_key_global: None})
     }
 
-    pub fn insert_entry(&mut self, entry: &Entry) -> Result<()> {
+    pub fn insert(&mut self, entry: Entry) -> Result<()> {
         self.insert_data(entry)
     }
 
-    pub fn insert_memtable_entry(&mut self, entry: &MemtableEntry) -> Result<()> {
-        let entry = Entry::from(entry);
-        self.insert_data(&entry)
-    }
-
-    fn insert_data(&mut self, entry: &Entry) -> Result<()> {
+    fn insert_data(&mut self, entry: Entry) -> Result<()> {
         let entry_ser = entry.serialize()?;
 
         self.writer_file.write_all(&entry_ser)
