@@ -5,14 +5,14 @@ use std::fmt;
 
 // Define the MerkleNode structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct MerkleNode {
+pub struct MerkleNode {
     left: Option<Box<MerkleNode>>,
     right: Option<Box<MerkleNode>>,
     data: String,
 }
 
 impl MerkleNode {
-    fn new(data: String) -> MerkleNode {
+    pub fn new(data: String) -> MerkleNode {
         MerkleNode {
             left: None,
             right: None,
@@ -20,7 +20,7 @@ impl MerkleNode {
         }
     }
 
-    fn hash(&self) -> String {
+    pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
         self.data.hash(&mut hasher);
         format!("{:x}", hasher.finish())
@@ -29,17 +29,17 @@ impl MerkleNode {
 
 // Define the MerkleRoot structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct MerkleRoot {
+pub struct MerkleRoot {
     root: Option<String>,
 }
 
 impl MerkleRoot {
-    fn new(data: Vec<String>) -> MerkleRoot {
+    pub fn new(data: Vec<String>) -> MerkleRoot {
         let root = MerkleRoot::build_merkle_root(data);
         MerkleRoot { root }
     }
 
-    fn build_merkle_root(data: Vec<String>) -> Option<String> {
+    pub fn build_merkle_root(data: Vec<String>) -> Option<String> {
         let nodes: Vec<MerkleNode> = data.into_iter().map(MerkleNode::new).collect();
         let mut current_layer = nodes;
 
@@ -70,7 +70,7 @@ impl MerkleRoot {
         current_layer.first().map(|node| node.hash())
     }
 
-    fn get_root_hash(&self) -> Option<&String> {
+    pub fn get_root_hash(&self) -> Option<&String> {
         self.root.as_ref()
     }
 }
