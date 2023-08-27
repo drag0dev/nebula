@@ -2,19 +2,25 @@ use std::collections::{HashMap, VecDeque};
 
 /// LRU cache
 pub struct Cache {
+    /// None is not used as a placeholder rather it represnts a tombstone
     data: VecDeque<Option<Vec<u8>>>,
+
+    /// max number of entries in the cash
     capacity: u64,
+
     size: u64,
+
+    /// mapping keys to indices in the data
     mapping: HashMap<Vec<u8>, usize>,
 }
 
 impl Cache {
     pub fn new(capacity: u64) -> Self {
         Cache {
-            data: VecDeque::new(),
+            data: VecDeque::with_capacity(capacity as usize),
             capacity,
             size: 0,
-            mapping: HashMap::new(),
+            mapping: HashMap::with_capacity(capacity as usize),
         }
     }
 
@@ -45,22 +51,28 @@ impl Cache {
     pub fn add(&mut self, key: &[u8], value: Option<&[u8]>) {
         let index = self.mapping.get(key);
         if let Some(index) = index {
-            let mut element = self.data.remove(*index).unwrap();
+            let index = index.clone();
+            let mut element = self.data.remove(index).unwrap();
             let new_value = if let Some(value) = value { Some(value.to_owned()) } else { None };
             element = new_value;
             self.data.push_front(element);
-            for entry in self.mapping.iter_mut() { *entry.1 += 1 }
+
+            for entry in self.mapping.iter_mut() {
+                if *entry.1 < index { *entry.1 += 1; }
+            }
             *self.mapping.get_mut(key).unwrap() = 0;
         } else {
-            self.check_space(); for entry in self.mapping.iter_mut() { *entry.1 += 1 }
+            self.check_space();
+            for entry in self.mapping.iter_mut() { *entry.1 += 1 }
             self.mapping.insert(key.to_vec(), 0);
+
             let value = if let Some(value) = value { Some(value.to_owned()) } else { None };
             self.data.push_front(value);
             self.size += 1;
         }
     }
 
-    /// removes an entry that was used the least
+    /// removes an entry that was used the least if there is no space
     fn check_space(&mut self) {
         assert!(self.size <= self.capacity);
         if self.size == self.capacity {
@@ -74,7 +86,7 @@ impl Cache {
             }
             assert!(key.is_some());
             let key = key.unwrap();
-            self.mapping.remove(&key);
+            _ = self.mapping.remove(&key);
             self.size -= 1;
         }
     }
