@@ -1,22 +1,14 @@
 use anyhow::Context;
 use anyhow::Result;
 use sstable::SSTableReaderSingleFile;
-use std::collections::HashMap;
 use std::fs::create_dir;
 use std::fs::remove_dir_all;
 use std::ops::Range;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::SystemTime;
 
-use crate::building_blocks::bloomfilter;
 use crate::building_blocks::sstable;
 use crate::building_blocks::Entry;
-use crate::building_blocks::Memtable;
-use crate::utils::merge_sort;
-
-use super::MemtableEntry;
-use super::SummaryEntry;
 
 fn s(k: &Vec<u8>) -> String {
     String::from_utf8(k.clone()).unwrap()
@@ -32,23 +24,6 @@ struct TableNode {
 #[derive(Debug)]
 struct Level {
     nodes: Vec<TableNode>,
-}
-
-// will remove I was confused
-impl Clone for TableNode {
-    fn clone(&self) -> TableNode {
-        TableNode {
-            path: self.path.clone(),
-        }
-    }
-}
-
-impl Clone for Level {
-    fn clone(&self) -> Level {
-        Level {
-            nodes: self.nodes.clone(),
-        }
-    }
 }
 
 pub struct LSMTree {
@@ -95,21 +70,6 @@ impl LSMTree {
                 let mut index = reader.index_iter().unwrap();
                 let (sum_iter, sum_range) = reader.summary_iter().unwrap();
 
-                // let br: Vec<(String, String)> = reader
-                //     .summary_iter()
-                //     .unwrap()
-                //     .0
-                //     .into_iter()
-                //     .map(|x| {
-                //         (
-                //             s(x.as_ref().unwrap().first_key.as_ref()),
-                //             s(&x.unwrap().last_key),
-                //         )
-                //     })
-                //     .collect();
-                // println!("{}", sum_iter.iter().collect())
-
-                // println!("BR: {:?}", br);
                 if sum_range.first_key > key {
                     continue;
                 }
@@ -117,36 +77,12 @@ impl LSMTree {
                     continue;
                 }
 
-                println!(
-                    "Found Summary range: {:?} {:?}",
-                    s(&sum_range.first_key),
-                    s(&sum_range.last_key)
-                );
-
                 for e in sum_iter {
                     let sum_entry = e.unwrap();
 
                     if sum_entry.first_key <= key {
-                        // println!(
-                        //     "sum_entryleft: {:?} {:?} {:?}",
-                        //     s(&sum_entry.first_key),
-                        //     s(&sum_entry.last_key),
-                        //     sum_entry.offset
-                        // );
                         if sum_entry.last_key >= key {
-                            //     println!(
-                            //         "sum_entryright: {:?} {:?} {:?}",
-                            //         s(&sum_entry.first_key),
-                            //         s(&sum_entry.last_key),
-                            //         sum_entry.offset
-                            //     );
-                            println!(
-                                "Entry range: {:?} {:?}",
-                                s(&sum_entry.first_key),
-                                s(&sum_entry.last_key)
-                            );
                             sum_offset = Some(sum_entry.offset);
-                            println!("Summary offset found: {:?}", sum_offset.unwrap());
                             break;
                         }
                     }
@@ -160,7 +96,6 @@ impl LSMTree {
                 assert!(entries.is_ok());
                 let mut entries = entries.unwrap();
 
-                println!("sumset: {:?}", sum_offset);
                 assert!(sum_offset.is_some());
                 let offset = sum_offset.unwrap();
                 index.move_iter(offset).unwrap();
@@ -171,18 +106,8 @@ impl LSMTree {
                         continue;
                     }
 
-                    println!("entry.key = {:?}  key = {:?}", s(&entry.key), s(&key));
-
-                    println!(
-                        "Found key {:?} @ sum offset: {:?} / idx offset: {:?}",
-                        s(&key),
-                        sum_offset.unwrap(),
-                        offset
-                    );
-
                     entries.move_iter(offset).unwrap();
                     let entry_ok = entries.next().unwrap().unwrap();
-                    println!("entry_ok: {:?}", entry_ok);
                     return Some(entry_ok);
                 }
                 return None;
@@ -193,14 +118,10 @@ impl LSMTree {
     }
 
     fn count_tables(&self, level_num: usize) -> usize {
-        // let b = self.levels[level_num];
-        // let a = b.nodes.len();
         self.levels[level_num].nodes.len()
     }
 
     fn count_entries(&self, table_path: String) -> usize {
-        // let b = self.levels[level_num];
-        // let a = b.nodes.len();
         let reader = SSTableReaderSingleFile::load(&(format!("test-data/{}", table_path)));
         println!("Counting entries of table: {}", table_path);
         let reader = reader.unwrap();
@@ -222,10 +143,9 @@ impl LSMTree {
         self.levels[0].nodes.push(node);
     }
 
-    // NOTE: tombstone at the bottom level is useless (just delete it)
-    // TODO: TOMBSTONES SHOULD BE PROPAGETED TO NEXT LEVEL NOT JUST IGNORED IN ALL CASES
+    // TODO: IF TOMBSTONE AT LAST (BOTTOM) LEVEL, JUST DELETE IT
     // NOTE: VECTOR COULD FILL UP ALL MEMORY (IF USER INPUTS 10000000 SAME KEYS)
-    // Function to resolve a sequence of entries with the same key
+    /// Function to resolve a sequence of entries with the same key
     fn resolve_entries(&mut self, entries: &mut Vec<Rc<Entry>>) -> Option<Rc<Entry>> {
         // Sort the entries by timestamp
         entries.sort_by_key(|e| e.timestamp);
@@ -343,8 +263,6 @@ fn insert_range(
     let mut entries: Vec<String> = range.map(|i| i.to_string()).collect();
 
     entries.sort();
-
-    // println!("INEERTING {:?}", entries);
 
     let mut path;
     if let Some(name) = base_filename {
