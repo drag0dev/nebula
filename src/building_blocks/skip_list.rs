@@ -117,6 +117,18 @@ impl<T: Ord + Default> SkipList<T> {
         }
     }
 
+    pub fn get_first_row_nodes(&self) -> Vec<Rc<RefCell<SkipListNode<T>>>> {
+            let mut first_row_nodes = Vec::new();
+            let mut current = self.head.borrow().next_nodes[0].as_ref().map(Rc::clone);
+
+            while let Some(node) = current {
+                first_row_nodes.push(node.clone());
+                current = node.borrow().next_nodes[0].as_ref().map(Rc::clone);
+            }
+
+            first_row_nodes
+        }
+
     fn roll(&mut self) -> usize {
         let mut level = 1;
         let probability = 0.5; 
@@ -129,6 +141,34 @@ impl<T: Ord + Default> SkipList<T> {
         level
     }
 }
+
+impl<T: std::fmt::Debug> SkipList<T> {
+    pub fn print(&self) {
+        for level in (0..self.max_level).rev() {
+            let mut current = Rc::clone(&self.head);
+            let mut nodes = Vec::new();
+
+            loop {
+                let next_reference = current.borrow().next_nodes[level].as_ref().map(Rc::clone);
+
+                match next_reference {
+                    Some(next) => {
+                        nodes.push(format!("{:?}", next.borrow().value));
+                        current = Rc::clone(&next);
+                    }
+                    None => break,
+                }
+            }
+
+            if !nodes.is_empty() {
+                let nodes_str = nodes.join(" - ");
+                println!("{}", nodes_str);
+            }
+        }
+        println!();
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -205,4 +245,20 @@ mod tests {
         assert_eq!(skip_list.search(25).map(|node| node.borrow().value), None);
         assert_eq!(skip_list.search(100).map(|node| node.borrow().value), None);
     }
+    
+    #[test]
+        fn get_first_row_nodes_test() {
+            let mut skip_list = SkipList::new();
+            skip_list.insert(3);
+            skip_list.insert(7);
+            skip_list.insert(1);
+            skip_list.insert(9);
+
+            let first_row_nodes = skip_list.get_first_row_nodes();
+
+            assert_eq!(first_row_nodes.len(), 4);
+
+            let values: Vec<_> = first_row_nodes.iter().map(|node| node.borrow().value).collect();
+            assert_eq!(values, vec![1, 3, 7, 9]);
+        }
 }
