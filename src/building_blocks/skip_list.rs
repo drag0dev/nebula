@@ -3,6 +3,8 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::default::Default;
 
+use super::{StorageCRUD, MemtableEntry};
+
 pub struct SkipListNode<T> {
     value: T,
     next_nodes: Vec<Option<Rc<RefCell<SkipListNode<T>>>>>,
@@ -117,6 +119,18 @@ impl<T: Ord + Default> SkipList<T> {
         }
     }
 
+    pub fn get_first_row_nodes(&self) -> Vec<Rc<RefCell<SkipListNode<T>>>> {
+            let mut first_row_nodes = Vec::new();
+            let mut current = self.head.borrow().next_nodes[0].as_ref().map(Rc::clone);
+
+            while let Some(node) = current {
+                first_row_nodes.push(node.clone());
+                current = node.borrow().next_nodes[0].as_ref().map(Rc::clone);
+            }
+
+            first_row_nodes
+        }
+
     fn roll(&mut self) -> usize {
         let mut level = 1;
         let probability = 0.5; 
@@ -127,6 +141,78 @@ impl<T: Ord + Default> SkipList<T> {
         }
 
         level
+    }
+}
+
+impl StorageCRUD for SkipList<MemtableEntry> {
+    fn create(&mut self, item: MemtableEntry) {
+        self.insert(item);
+    }
+
+    fn read(&mut self, key: String) -> Option<Rc<RefCell<MemtableEntry>>> {
+        let search_result = self.search(MemtableEntry::new(0, key.clone(), None));
+        if let Some(node) = search_result {
+            let value = node.borrow().value.clone();
+            let entry = MemtableEntry::new(value.timestamp, value.key.clone(), value.value.clone());
+            Some(Rc::new(RefCell::new(entry)))
+        } else {
+            None
+        }
+    }
+
+    fn update(&mut self, item: MemtableEntry) {
+            if let Some(existing_node) = self.search(item.clone()) {
+                let existing_entry = existing_node.borrow_mut();
+                let existing_value = existing_entry.value.clone();
+                self.delete(existing_value.clone());
+            }
+            self.insert(item);
+        }
+
+    fn delete(&mut self, item: MemtableEntry) {
+        self.delete(item);
+    }
+
+    fn clear(&mut self) {
+        *self = SkipList::new();
+    }
+
+    fn entries(&self) -> Vec<Rc<RefCell<MemtableEntry>>> {
+        self.get_first_row_nodes()
+            .iter()
+            .map(|node| {
+                let value = node.borrow().value.clone();
+                let entry = MemtableEntry::new(value.timestamp, value.key.clone(), value.value.clone());
+                Rc::new(RefCell::new(entry))
+            })
+            .collect()
+    }
+}
+
+impl<T: std::fmt::Debug> SkipList<T> {
+    pub fn print(&self) {
+        for level in (0..self.max_level).rev() {
+            let mut current = Rc::clone(&self.head);
+            let mut nodes = Vec::new();
+
+            loop {
+                let next_reference = current.borrow().next_nodes[level].as_ref().map(Rc::clone);
+
+                match next_reference {
+                    Some(next) => {
+                        nodes.push(format!("{:?}", next.borrow().value));
+                        current = Rc::clone(&next);
+                    }
+                    None => break,
+                }
+            }
+
+            if !nodes.is_empty() {
+                let nodes_str = nodes.join(" - ");
+                println!("{}", nodes_str);
+            }
+        }
+        println!();
     }
 }
 
@@ -205,4 +291,20 @@ mod tests {
         assert_eq!(skip_list.search(25).map(|node| node.borrow().value), None);
         assert_eq!(skip_list.search(100).map(|node| node.borrow().value), None);
     }
+    
+    #[test]
+        fn get_first_row_nodes_test() {
+            let mut skip_list = SkipList::new();
+            skip_list.insert(3);
+            skip_list.insert(7);
+            skip_list.insert(1);
+            skip_list.insert(9);
+
+            let first_row_nodes = skip_list.get_first_row_nodes();
+
+            assert_eq!(first_row_nodes.len(), 4);
+
+            let values: Vec<_> = first_row_nodes.iter().map(|node| node.borrow().value).collect();
+            assert_eq!(values, vec![1, 3, 7, 9]);
+        }
 }
