@@ -216,7 +216,6 @@ impl<T: std::fmt::Debug> SkipList<T> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
