@@ -32,7 +32,9 @@ mod token_bucket;
 mod memtable;
 mod sstable;
 mod skip_list;
+mod merkle_tree;
 mod b_tree;
+mod merkle_tree;
 
 pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
@@ -52,4 +54,8 @@ pub use sstable::{
 };
 pub use skip_list::SkipList;
 pub use skip_list::SkipListNode;
+pub use merkle_tree::MerkleNode;
+pub use merkle_tree::MerkleRoot;
 pub use b_tree::BTree;
+pub use merkle_tree::MerkleNode;
+pub use merkle_tree::MerkleRoot;
