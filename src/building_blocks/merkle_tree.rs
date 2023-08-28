@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::fmt;
@@ -8,11 +8,11 @@ use std::fmt;
 pub struct MerkleNode {
     left: Option<Box<MerkleNode>>,
     right: Option<Box<MerkleNode>>,
-    data: String,
+    data: Vec<u8>,
 }
 
 impl MerkleNode {
-    pub fn new(data: String) -> MerkleNode {
+    pub fn new(data: Vec<u8>) -> MerkleNode {
         MerkleNode {
             left: None,
             right: None,
@@ -30,16 +30,16 @@ impl MerkleNode {
 // Define the MerkleRoot structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MerkleRoot {
-    root: Option<String>,
+    root: Option<Vec<u8>>,
 }
 
 impl MerkleRoot {
-    pub fn new(data: Vec<String>) -> MerkleRoot {
+    pub fn new(data: Vec<Vec<u8>>) -> MerkleRoot {
         let root = MerkleRoot::build_merkle_root(data);
         MerkleRoot { root }
     }
 
-    pub fn build_merkle_root(data: Vec<String>) -> Option<String> {
+    pub fn build_merkle_root(data: Vec<Vec<u8>>) -> Option<Vec<u8>> {
         let nodes: Vec<MerkleNode> = data.into_iter().map(MerkleNode::new).collect();
         let mut current_layer = nodes;
 
@@ -58,7 +58,7 @@ impl MerkleRoot {
                 let new_node = MerkleNode {
                     left: Some(Box::new(left)),
                     right: Some(Box::new(right)),
-                    data: combined.clone(),
+                    data: combined.as_bytes().to_vec(),
                 };
 
                 new_layer.push(new_node);
@@ -67,10 +67,10 @@ impl MerkleRoot {
             current_layer = new_layer;
         }
 
-        current_layer.first().map(|node| node.hash())
+        current_layer.first().map(|node| node.data.clone())
     }
 
-    pub fn get_root_hash(&self) -> Option<&String> {
+    pub fn get_root_hash(&self) -> Option<&Vec<u8>> {
         self.root.as_ref()
     }
 }
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_merkle_node_hash() {
-        let node = MerkleNode::new("data".to_string());
+        let node = MerkleNode::new(vec![1, 2, 3]);
         let hash = node.hash();
         // Hash length is 16 hexadecimal characters
         assert_eq!(hash.len(), 16);
@@ -96,11 +96,11 @@ mod tests {
     #[test]
     fn test_merkle_root_building() {
         let data = vec![
-            String::from_utf8(b"data1".to_vec()).unwrap(),
-            String::from_utf8(b"data2".to_vec()).unwrap(),
-            String::from_utf8(b"data3".to_vec()).unwrap(),
-            String::from_utf8(b"data4".to_vec()).unwrap(),
-            String::from_utf8(b"data5".to_vec()).unwrap(),
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9],
+            vec![10, 11, 12],
+            vec![13, 14, 15],
         ];
 
         let merkle_root = MerkleRoot::new(data.clone());
@@ -109,16 +109,18 @@ mod tests {
 
     #[test]
     fn test_merkle_root_serialization_deserialization() {
+        use bincode::{serialize, deserialize};
+
         let data = vec![
-            "data1".to_string(),
-            "data2".to_string(),
-            "data3".to_string(),
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9],
         ];
 
         let merkle_root = MerkleRoot::new(data.clone());
 
-        let serialized = serde_json::to_string(&merkle_root).unwrap();
-        let deserialized: MerkleRoot = serde_json::from_str(&serialized).unwrap();
+        let serialized = serialize(&merkle_root).unwrap();
+        let deserialized: MerkleRoot = deserialize(&serialized).unwrap();
 
         assert_eq!(merkle_root.root, deserialized.root);
     }
@@ -126,9 +128,9 @@ mod tests {
     #[test]
     fn test_merkle_root_get_root_hash() {
         let data = vec![
-            "data1".to_string(),
-            "data2".to_string(),
-            "data3".to_string(),
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9],
         ];
 
         let merkle_root = MerkleRoot::new(data.clone());
@@ -150,16 +152,15 @@ mod tests {
                 let new_node = MerkleNode {
                     left: Some(Box::new(left)),
                     right: Some(Box::new(right)),
-                    data: combined.clone(),
+                    data: combined.as_bytes().to_vec(),
                 };
 
                 new_nodes.push(new_node);
             }
             nodes = new_nodes;
         }
-        let expected_root_hash = nodes[0].hash();
+        let expected_root_hash = nodes[0].data.clone();
 
         assert_eq!(&expected_root_hash, root_hash);
     }
 }
-
