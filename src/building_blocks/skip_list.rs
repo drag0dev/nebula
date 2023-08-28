@@ -3,6 +3,8 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::default::Default;
 
+use super::{StorageCRUD, MemtableEntry};
+
 pub struct SkipListNode<T> {
     value: T,
     next_nodes: Vec<Option<Rc<RefCell<SkipListNode<T>>>>>,
@@ -139,6 +141,51 @@ impl<T: Ord + Default> SkipList<T> {
         }
 
         level
+    }
+}
+
+impl StorageCRUD for SkipList<MemtableEntry> {
+    fn create(&mut self, item: MemtableEntry) {
+        self.insert(item);
+    }
+
+    fn read(&mut self, key: String) -> Option<Rc<RefCell<MemtableEntry>>> {
+        let search_result = self.search(MemtableEntry::new(0, key.clone(), None));
+        if let Some(node) = search_result {
+            let value = node.borrow().value.clone();
+            let entry = MemtableEntry::new(value.timestamp, value.key.clone(), value.value.clone());
+            Some(Rc::new(RefCell::new(entry)))
+        } else {
+            None
+        }
+    }
+
+    fn update(&mut self, item: MemtableEntry) {
+            if let Some(existing_node) = self.search(item.clone()) {
+                let existing_entry = existing_node.borrow_mut();
+                let existing_value = existing_entry.value.clone();
+                self.delete(existing_value.clone());
+            }
+            self.insert(item);
+        }
+
+    fn delete(&mut self, item: MemtableEntry) {
+        self.delete(item);
+    }
+
+    fn clear(&mut self) {
+        *self = SkipList::new();
+    }
+
+    fn entries(&self) -> Vec<Rc<RefCell<MemtableEntry>>> {
+        self.get_first_row_nodes()
+            .iter()
+            .map(|node| {
+                let value = node.borrow().value.clone();
+                let entry = MemtableEntry::new(value.timestamp, value.key.clone(), value.value.clone());
+                Rc::new(RefCell::new(entry))
+            })
+            .collect()
     }
 }
 
