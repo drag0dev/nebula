@@ -1,4 +1,4 @@
-fn merge<T: Copy + Ord>(left_half: &[T], right_half: &[T], y: &mut [T]) {
+fn merge<T: Copy + Ord + Clone>(left_half: &[T], right_half: &[T], y: &mut [T]) {
     let mut l = 0;
     let mut r = 0;
     let mut i = 0;
