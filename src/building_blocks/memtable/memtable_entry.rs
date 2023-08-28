@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(PartialEq, Eq, Ord, Debug, Clone)]
+#[derive(Ord, Debug, Clone)]
 pub struct MemtableEntry {
     /// nanos
     pub timestamp: u128,
@@ -31,6 +31,23 @@ impl MemtableEntry {
     /// and are older than the entry in the lsm tree if there is one
     pub fn update(&mut self, value: Option<String>) {
         self.value = value;
+    }
+}
+
+impl PartialEq for MemtableEntry {
+    fn eq(&self, other: &MemtableEntry) -> bool {
+        self.key == other.key
+    }
+}
+impl Eq for MemtableEntry {}
+
+impl Default for MemtableEntry {
+    fn default() -> Self {
+        MemtableEntry {
+            timestamp: 0,
+            key: "".to_string(),
+            value: None
+        }
     }
 }
 
