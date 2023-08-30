@@ -40,7 +40,6 @@ pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
 pub use hyperloglog::HyperLogLog;
 pub use count_min_sketch::CountMinSketch;
-pub use simhash::SimHash;
 pub use token_bucket::TokenBucket;
 pub use memtable::Memtable;
 pub use memtable::StorageCRUD;

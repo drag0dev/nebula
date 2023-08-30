@@ -388,7 +388,7 @@ impl LSMTree {
                         if let Some(resolved_entry) =
                             self.resolve_entries(&mut relevant_entries, level_num)
                         {
-                            builder.insert_entry(&resolved_entry).unwrap();
+                            builder.insert((*resolved_entry).clone()).unwrap();
                         }
                         relevant_entries.clear();
                         relevant_entries.push(Rc::clone(&entry_ref));
@@ -401,7 +401,7 @@ impl LSMTree {
                     if let Some(resolved_entry) =
                         self.resolve_entries(&mut relevant_entries, level_num)
                     {
-                        builder.insert_entry(&resolved_entry).unwrap();
+                        builder.insert((*resolved_entry).clone()).unwrap();
                     }
                     break; // Break when all iterators are exhausted
                 }
@@ -482,7 +482,7 @@ fn insert_range(
         };
 
         builder
-            .insert_entry(&entry)
+            .insert(entry)
             .context("inserting entry into the sstable")
             .unwrap();
 
