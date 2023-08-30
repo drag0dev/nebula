@@ -3,7 +3,6 @@
 use anyhow::Context;
 use anyhow::Result;
 use sstable::SSTableReaderSingleFile;
-use std::fs::create_dir;
 use std::fs::remove_dir_all;
 use std::fs::rename;
 use std::ops::Range;
@@ -13,66 +12,17 @@ use std::rc::Rc;
 use crate::building_blocks::sstable;
 use crate::building_blocks::Entry;
 
-use super::SSTableIteratorSingleFile;
+use super::{LSMTree, TableNode, Level};
 
-fn s(k: &Vec<u8>) -> String {
-    String::from_utf8(k.clone()).unwrap()
-}
-
-fn print_table(dir: &str, lsm: &LSMTree, l: usize, t: usize) {
-    SSTableReaderSingleFile::load(&format!("{dir}/{}", &lsm.levels[l].nodes[t].path))
-        .unwrap()
-        .iter()
-        .unwrap()
-        .for_each(|x| {
-            let xx = &x.unwrap();
-            println!(
-                "{:?}",
-                (
-                    s(&xx.key),
-                    if xx.value.is_some().clone() {
-                        "entr"
-                    } else {
-                        "tomb"
-                    }
-                )
-            );
-        });
-}
-
-#[derive(Debug)]
-struct TableNode {
-    path: String,
-}
-
-// NOTE: this could be replaced with a BTree for increased efficiency
-// but this is simpler and just works for now.
-#[derive(Debug)]
-struct Level {
-    nodes: Vec<TableNode>,
-}
-
-pub struct LSMTree {
-    levels: Vec<Level>,
-    // level size ?
-    // tier size ?
-    // tables per tier ?
-    fp_prob: f64,     // bloomfilter false positive probability
-    item_count: u64,  // bloomfilter item count
-    summary_nth: u64, // idk
-    data_dir: String,
-    size_threshold: usize,
-    last_table: usize,
-}
-
-impl LSMTree {
+impl<SF> LSMTree<SF> {
     pub fn new(
-        item_count: u64,
         fp_prob: f64,
         summary_nth: u64,
         data_dir: String,
         size_threshold: usize,
     ) -> Self {
+
+        let marker: std::marker::PhantomData<SF> = Default::default();
         LSMTree {
             levels: vec![
                 Level { nodes: vec![] },
@@ -80,11 +30,12 @@ impl LSMTree {
                 Level { nodes: vec![] },
             ],
             fp_prob,
-            item_count,
             summary_nth,
             data_dir,
             size_threshold,
             last_table: 0,
+            tables_item_counts: vec![],
+            marker,
         }
     }
 
@@ -99,7 +50,6 @@ impl LSMTree {
     /// let dir = String::from("data");
     ///
     /// let mut lsm = LSMTree::new(
-    ///     100, // item_count: u64,
     ///     0.1, // fp_prob: f64,
     ///     10,  // summary_nth: u64,
     ///     dir, // data_dir: String,
@@ -183,31 +133,11 @@ impl LSMTree {
                 return None;
             }
         }
-        println!();
         None
     }
 
-    fn count_tables(&self, level_num: usize) -> usize {
-        self.levels[level_num].nodes.len()
-    }
-
-    fn count_entries(&self, table_path: String) -> usize {
-        let reader = SSTableReaderSingleFile::load(&(format!("test-data/{}", table_path)));
-        println!("Counting entries of table: {}", table_path);
-        let reader = reader.unwrap();
-        println!(
-            "{:?}",
-            reader
-                .iter()
-                .unwrap()
-                .map(|e| s(&e.unwrap().key))
-                .collect::<Vec<String>>()
-        );
-        reader.iter().unwrap().collect::<Vec<_>>().len()
-    }
-
     /// Private function for appending the table names to each level
-    fn append_table(&mut self, path: &str) -> Result<()> {
+    pub(super) fn append_table(&mut self, path: &str) -> Result<()> {
         let node = TableNode {
             path: String::from(path),
         };
@@ -219,21 +149,9 @@ impl LSMTree {
     fn _insert(&mut self, path: &str) -> Result<()> {
         self.append_table(path).context("appending table")?;
 
-        self.levels
-            .iter()
-            .enumerate()
-            .map(|(idx, l)| {
-                (
-                    idx,
-                    l.nodes.iter().map(|n| n.path.clone()).collect::<Vec<_>>(),
-                )
-            })
-            .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
-
         let dir = { self.data_dir.clone() };
 
         if self.levels[0].nodes.len() >= self.size_threshold {
-            println!("MERGING 0");
             self.merge(0, &dir).context("merging")?;
         }
         Ok(())
@@ -254,7 +172,6 @@ impl LSMTree {
     /// let dir = String::from("data");
     ///
     /// let mut lsm = LSMTree::new(
-    ///     100, // item_count: u64,
     ///     0.1, // fp_prob: f64,
     ///     10,  // summary_nth: u64,
     ///     dir, // data_dir: String,
@@ -337,16 +254,8 @@ impl LSMTree {
             }
         }
 
-        let tablename = &format!("sstable-{}-{}", level_num + 1, last + 1);
 
-        let mut builder = sstable::SSTableBuilderSingleFile::new(
-            dirname,
-            tablename,
-            self.item_count,
-            self.fp_prob,
-            self.summary_nth,
-        )
-        .context("creating builder")?;
+        let tablename = &format!("sstable-{}-{}", level_num + 1, last + 1);
 
         let mut iterators: Vec<_> = self.levels[level_num]
             .nodes
@@ -361,6 +270,27 @@ impl LSMTree {
                     .peekable()
             })
             .collect();
+
+        let mut sum_item_counts = 0;
+        {
+            for table in &self.levels[level_num].nodes {
+                let sstable = SSTableReaderSingleFile::load(&(format!("{}/{}", dirname, table.path)));
+                let sstable = sstable.context("unwrapping for bf")?;
+                let bf = sstable.read_filter().context("unwrapping bf")?;
+                sum_item_counts += bf.item_count;
+            }
+        }
+
+        let mut builder = sstable::SSTableBuilderSingleFile::new(
+            dirname,
+            tablename,
+            sum_item_counts,
+            self.fp_prob,
+            self.summary_nth,
+        )
+        .context("creating builder")?;
+
+
 
         let mut last_key: Option<Vec<u8>> = None;
         let mut relevant_entries: Vec<Rc<Entry>> = Vec::new();
@@ -435,109 +365,6 @@ impl LSMTree {
     }
 }
 
-fn insert_range(
-    range: &mut Range<i32>,
-    dir: &str,
-    lsm: &mut LSMTree,
-    tombstone: bool,
-    auto_merge: bool,
-    base: &str,
-) -> Result<(), ()> {
-    // must sort entries
-    let mut entries: Vec<String> = range.map(|i| i.to_string()).collect();
-
-    entries.sort();
-
-    let mut path;
-    if base.is_empty() {
-        if tombstone {
-            path = String::from("test-tombs-0-0");
-        } else {
-            path = String::from("test-sstable-0-0");
-        }
-    } else {
-        path = String::from(format!("test-{base}-0-0"));
-    }
-
-    let mut builder = sstable::SSTableBuilderSingleFile::new(dir, &path, 100, 0.1, 10)
-        .expect("creating a sstable");
-
-    println!("created builder: {dir}/{path}");
-    for (idx, key) in entries.iter().enumerate() {
-        let val;
-        let timestmp;
-
-        if tombstone {
-            val = None;
-            timestmp = ((idx + 1) * 1000) as u128;
-        } else {
-            val = Some(key.to_string().into_bytes());
-            timestmp = idx as u128;
-        }
-
-        let entry = Entry {
-            timestamp: timestmp,
-            key: key.to_string().into_bytes(),
-            value: val,
-        };
-
-        builder
-            .insert(entry)
-            .context("inserting entry into the sstable")
-            .unwrap();
-
-        if idx < 100 {
-            continue;
-        }
-
-        // finish previous and start new
-        if idx % 100 == 0 {
-            builder
-                .finish_data()
-                .context(format!("finishing sstable {dir}/{path}"))
-                .unwrap();
-            println!("finished builder: {dir}/{path}");
-
-            if auto_merge {
-                lsm.insert(&path)
-                    .context(format!("inserting sstable {dir}/{path}"))
-                    .unwrap();
-            } else {
-                lsm.append_table(&path)
-                    .context(format!("inserting sstable {dir}/{path}"))
-                    .unwrap();
-            }
-            println!("inserted sstable: {dir}/{path}");
-
-            if tombstone {
-                path = format!("test-tombs-0-{}", idx / 100);
-            } else {
-                path = format!("test-sstable-0-{}", idx / 100);
-            }
-
-            builder = sstable::SSTableBuilderSingleFile::new(dir, &path, 100, 0.1, 10)
-                .context(format!("opening sstable {dir}/{path}"))
-                .unwrap();
-            println!("created builder: {dir}/{path}");
-        }
-    }
-
-    builder.finish_data().expect("finishing big sstable");
-    println!("finished builder: {dir}/{path}");
-
-    if auto_merge {
-        lsm.insert(&path)
-            .context(format!("inserting sstable {dir}/{path}"))
-            .unwrap();
-    } else {
-        lsm.append_table(&path)
-            .context(format!("inserting sstable {dir}/{path}"))
-            .unwrap();
-    }
-    println!("inserted {path}");
-
-    Ok(())
-}
 
 macro_rules! redo_dirs {
     ($expr:expr) => {
@@ -597,7 +424,7 @@ fn lsm_insert() -> Result<(), ()> {
     let test_path = "test-data/lsm-insert";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "")
 }
@@ -607,7 +434,7 @@ fn lsm_read() -> Result<(), ()> {
     let test_path = "./test-data/lsm-read";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -674,7 +501,7 @@ fn lsm_merge_simple() {
     let test_path = "./test-data/lsm-merge-simple";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -741,17 +568,9 @@ fn lsm_merge_tombstones() {
     let test_path = "./test-data/lsm-merge-tombstones";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
-
-    let t = lsm.count_tables(0);
-    let t = lsm.count_tables(1);
-
-    println!("tables in tree: {t}");
-    println!("entries in table900: {t}");
-    println!("level0 {:?}", lsm.levels[0]);
-    println!("level1 {:?}", lsm.levels[1]);
 
     let keys = vec![
         "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
@@ -790,17 +609,9 @@ fn lsm_merge_mix_tomb() {
     let test_path = "./test-data/lsm-merge-mix-tomb";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
-
-    let t = lsm.count_tables(0);
-    let t = lsm.count_tables(1);
-
-    println!("tables in tree: {t}");
-    println!("entries in table900: {t}");
-    println!("level0 {:?}", lsm.levels[0]);
-    println!("level1 {:?}", lsm.levels[1]);
 
     let keys = vec![
         "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
@@ -866,7 +677,7 @@ fn lsm_merge_mix_tomb_auto() {
     let test_path = "./test-data/lsm-merge-mix-tomb-auto";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..700), test_path, &mut lsm, false, true, "").unwrap();
 
@@ -903,9 +714,6 @@ fn lsm_merge_mix_tomb_auto() {
             )
         })
         .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
-
-    // print_table(test_path, &lsm, 1, 0);
-    // print_table(test_path, &lsm, 2, 0);
 
     // deleted
     let keys = vec![

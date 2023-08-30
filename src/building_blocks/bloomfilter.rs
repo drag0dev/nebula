@@ -13,7 +13,7 @@ use super::BINCODE_OPTIONS;
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct BloomFilter{
-    item_count: u64,
+    pub item_count: u64,
     /// false positive probability
     fp_prob: f64,
     hash_functions: u64,
