@@ -3,68 +3,16 @@ use std::fs::{remove_dir_all, create_dir};
 use std::ops::Range;
 use std::path::Path;
 use crate::building_blocks::{
-    sstable::SF,
-    SSTableBuilderSingleFile as SSTableBuilder,
+    sstable::MF,
+    SSTableBuilderMultiFile as SSTableBuilder,
     Entry
 };
 use super::LSMTree;
 
-macro_rules! redo_dirs {
-    ($expr:expr) => {
-        let test_path = $expr;
-        let exists = Path::new(test_path).is_dir();
-        if exists {
-            remove_dir_all(test_path).expect("removing old data");
-        }
-        create_dir(test_path) .context("creating the test directory")
-            .expect("idk");
-    };
-}
-
-macro_rules! are_tombstones {
-    ($lsm:expr, $keys:expr, true) => {
-        for key in $keys {
-            let out = $lsm.get(Vec::from(key));
-            assert!(out.is_some());
-
-            let entry = out.unwrap();
-            assert_eq!(Vec::from(key), entry.key);
-            assert!(entry.value.is_none());
-        }
-    };
-
-    ($lsm:expr, $keys:expr, false) => {
-        for key in $keys {
-            let out = $lsm.get(Vec::from(key));
-            assert!(out.is_some());
-
-            let entry = out.unwrap();
-            assert_eq!(Vec::from(key), entry.key);
-            assert!(entry.value.is_some());
-        }
-    };
-}
-
-macro_rules! keys_exist {
-    ($lsm:expr, $keys:expr, true) => {
-        for key in $keys {
-            let out = $lsm.get(Vec::from(key));
-            assert!(out.is_some());
-        }
-    };
-
-    ($lsm:expr, $keys:expr, false) => {
-        for key in $keys {
-            let out = $lsm.get(Vec::from(key));
-            assert_eq!(out, None);
-        }
-    };
-}
-
 fn insert_range(
     range: &mut Range<i32>,
     dir: &str,
-    lsm: &mut LSMTree<SF>,
+    lsm: &mut LSMTree<MF>,
     tombstone: bool,
     auto_merge: bool,
     base: &str,
@@ -119,7 +67,7 @@ fn insert_range(
         // finish previous and start new
         if idx % 100 == 0 {
             builder
-                .finish_data()
+                .finish()
                 .context(format!("finishing sstable {dir}/{path}"))
                 .unwrap();
             println!("finished builder: {dir}/{path}");
@@ -148,7 +96,7 @@ fn insert_range(
         }
     }
 
-    builder.finish_data().expect("finishing big sstable");
+    builder.finish().expect("finishing big sstable");
     println!("finished builder: {dir}/{path}");
 
     if auto_merge {
@@ -165,13 +113,65 @@ fn insert_range(
     Ok(())
 }
 
+macro_rules! redo_dirs {
+    ($expr:expr) => {
+        let test_path = $expr;
+        let exists = Path::new(test_path).is_dir();
+        if exists {
+            remove_dir_all(test_path).expect("removing old data");
+        }
+        create_dir(test_path)
+            .context("creating the test directory")
+            .expect("idk");
+    };
+}
+
+macro_rules! are_tombstones {
+    ($lsm:expr, $keys:expr, true) => {
+        for key in $keys {
+            let out = $lsm.get(Vec::from(key));
+            assert!(out.is_some());
+
+            let entry = out.unwrap();
+            assert_eq!(Vec::from(key), entry.key);
+            assert!(entry.value.is_none());
+        }
+    };
+
+    ($lsm:expr, $keys:expr, false) => {
+        for key in $keys {
+            let out = $lsm.get(Vec::from(key));
+            assert!(out.is_some());
+
+            let entry = out.unwrap();
+            assert_eq!(Vec::from(key), entry.key);
+            assert!(entry.value.is_some());
+        }
+    };
+}
+
+macro_rules! keys_exist {
+    ($lsm:expr, $keys:expr, true) => {
+        for key in $keys {
+            let out = $lsm.get(Vec::from(key));
+            assert!(out.is_some());
+        }
+    };
+
+    ($lsm:expr, $keys:expr, false) => {
+        for key in $keys {
+            let out = $lsm.get(Vec::from(key));
+            assert_eq!(out, None);
+        }
+    };
+}
 
 #[test]
 fn lsm_insert() -> Result<(), ()> {
     let test_path = "test-data/lsm-insert";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<SF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "")
 }
@@ -181,7 +181,7 @@ fn lsm_read() -> Result<(), ()> {
     let test_path = "./test-data/lsm-read";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<SF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -248,7 +248,7 @@ fn lsm_merge_simple() {
     let test_path = "./test-data/lsm-merge-simple";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<SF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -315,9 +315,17 @@ fn lsm_merge_tombstones() {
     let test_path = "./test-data/lsm-merge-tombstones";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<SF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
+
+    // let t = lsm.count_tables(0);
+    // let t = lsm.count_tables(1);
+
+    // println!("tables in tree: {t}");
+    // println!("entries in table900: {t}");
+    // println!("level0 {:?}", lsm.levels[0]);
+    // println!("level1 {:?}", lsm.levels[1]);
 
     let keys = vec![
         "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
@@ -356,9 +364,17 @@ fn lsm_merge_mix_tomb() {
     let test_path = "./test-data/lsm-merge-mix-tomb";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<SF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
+
+    // let t = lsm.count_tables(0);
+    // let t = lsm.count_tables(1);
+
+    // println!("tables in tree: {t}");
+    // println!("entries in table900: {t}");
+    // println!("level0 {:?}", lsm.levels[0]);
+    // println!("level1 {:?}", lsm.levels[1]);
 
     let keys = vec![
         "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
@@ -424,7 +440,7 @@ fn lsm_merge_mix_tomb_auto() {
     let test_path = "./test-data/lsm-merge-mix-tomb-auto";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<SF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
 
     insert_range(&mut (0..700), test_path, &mut lsm, false, true, "").unwrap();
 
@@ -461,6 +477,9 @@ fn lsm_merge_mix_tomb_auto() {
             )
         })
         .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
+
+    // print_table(test_path, &lsm, 1, 0);
+    // print_table(test_path, &lsm, 2, 0);
 
     // deleted
     let keys = vec![
