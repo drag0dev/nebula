@@ -1,3 +1,5 @@
+// TODO: replace the unwraps with context()? if I have the time
+
 use anyhow::Context;
 use anyhow::Result;
 use sstable::SSTableReaderSingleFile;
@@ -10,8 +12,31 @@ use std::rc::Rc;
 use crate::building_blocks::sstable;
 use crate::building_blocks::Entry;
 
+use super::SSTableIteratorSingleFile;
+
 fn s(k: &Vec<u8>) -> String {
     String::from_utf8(k.clone()).unwrap()
+}
+
+fn print_table(dir: &str, lsm: &LSMTree, l: usize, t: usize) {
+    SSTableReaderSingleFile::load(&format!("{dir}/{}", &lsm.levels[l].nodes[t].path))
+        .unwrap()
+        .iter()
+        .unwrap()
+        .for_each(|x| {
+            let xx = &x.unwrap();
+            println!(
+                "{:?}",
+                (
+                    s(&xx.key),
+                    if xx.value.is_some().clone() {
+                        "entr"
+                    } else {
+                        "tomb"
+                    }
+                )
+            );
+        });
 }
 
 #[derive(Debug)]
@@ -35,10 +60,17 @@ pub struct LSMTree {
     item_count: u64,  // bloomfilter item count
     summary_nth: u64, // idk
     data_dir: String,
+    size_threshold: usize,
 }
 
 impl LSMTree {
-    pub fn new(item_count: u64, fp_prob: f64, summary_nth: u64, data_dir: String) -> Self {
+    pub fn new(
+        item_count: u64,
+        fp_prob: f64,
+        summary_nth: u64,
+        data_dir: String,
+        size_threshold: usize,
+    ) -> Self {
         LSMTree {
             levels: vec![
                 Level { nodes: vec![] },
@@ -49,12 +81,17 @@ impl LSMTree {
             item_count,
             summary_nth,
             data_dir,
+            size_threshold,
         }
     }
 
+    // TODO:
+    // traverse tables backwards (newest to oldest)
+    // if you encounter a tombstone, stop looking
+    // Can't use ? if func returns Option<T>
     pub fn get(&self, key: Vec<u8>) -> Option<Entry> {
         for level in &self.levels {
-            for table in &level.nodes {
+            for table in &level.nodes.iter().rev().collect::<Vec<&TableNode>>() {
                 let path = format!("{}/{}", self.data_dir, table.path);
                 let msg = format!("Failed to open file {path}");
                 let reader = SSTableReaderSingleFile::load(&path).context(msg).unwrap();
@@ -108,6 +145,12 @@ impl LSMTree {
 
                     entries.move_iter(offset).unwrap();
                     let entry_ok = entries.next().unwrap().unwrap();
+
+                    // if it's a tombstone, assume byebye
+                    if entry_ok.value.is_none() {
+                        return None;
+                    }
+
                     return Some(entry_ok);
                 }
                 return None;
@@ -136,47 +179,110 @@ impl LSMTree {
         reader.iter().unwrap().collect::<Vec<_>>().len()
     }
 
-    fn insert(&mut self, path: &str) {
+    fn append_table(&mut self, path: &str) -> Result<()> {
         let node = TableNode {
             path: String::from(path),
         };
         self.levels[0].nodes.push(node);
+
+        Ok(())
+    }
+
+    fn insert(&mut self, path: &str) -> Result<()> {
+        self.append_table(path).context("appending table")?;
+
+        self.levels
+            .iter()
+            .enumerate()
+            .map(|(idx, l)| {
+                (
+                    idx,
+                    l.nodes.iter().map(|n| n.path.clone()).collect::<Vec<_>>(),
+                )
+            })
+            .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
+
+        let dir = { self.data_dir.clone() };
+
+        if self.levels[0].nodes.len() >= self.size_threshold {
+            println!("MERGING 0");
+            self.merge(0, &dir).context("merging")?;
+        }
+        Ok(())
     }
 
     // TODO: IF TOMBSTONE AT LAST (BOTTOM) LEVEL, JUST DELETE IT
     // NOTE: VECTOR COULD FILL UP ALL MEMORY (IF USER INPUTS 10000000 SAME KEYS)
     /// Function to resolve a sequence of entries with the same key
-    fn resolve_entries(&mut self, entries: &mut Vec<Rc<Entry>>) -> Option<Rc<Entry>> {
+    fn resolve_entries(
+        &mut self,
+        entries: &mut Vec<Rc<Entry>>,
+        level_num: usize,
+    ) -> Option<Rc<Entry>> {
         // Sort the entries by timestamp
         entries.sort_by_key(|e| e.timestamp);
-        let mut stack: Vec<Rc<Entry>> = vec![];
+
+        // if the level is not the last one, just return newest entry
+        // if there are no entries return None
+        if level_num < self.levels.len() {
+            let last = entries.last();
+            if let Some(entry) = last {
+                return Some(Rc::clone(entry));
+            }
+            return None;
+        }
+
+        // else, traverse the entries backwards
+        // and get the newest non-tombstone entry
+        for entry in entries.iter().rev() {
+            if entry.value.is_none() {
+                continue;
+            }
+            return Some(Rc::clone(entry));
+        }
+        None
+
+        // let mut stack: Vec<Rc<Entry>> = vec![];
 
         // Iterate through the sorted entries and the last non-tombstone
         // entry that isn't succeeded by a tombstone entry is returned
-        for entry in entries {
-            // if tombstone
-            if entry.value.is_none() {
-                // if empty or all tombstones
-                if stack.is_empty() || stack.iter().all(|e| e.value == None) {
-                    stack.push(Rc::clone(entry));
-                } else {
-                    stack.pop();
-                }
-            } else {
-                stack.push(Rc::clone(entry));
-            }
-        }
-        stack.pop()
+        //for entry in entries {
+        //    // if tombstone
+        //    if entry.value.is_none() {
+        //        // if empty or all tombstones
+        //        if stack.is_empty() || stack.iter().all(|e| e.value == None) {
+        //            stack.push(Rc::clone(entry));
+        //        } else {
+        //            stack.pop();
+        //        }
+        //    } else {
+        //        stack.push(Rc::clone(entry));
+        //    }
+        //}
+        //stack.pop()
     }
 
     /// Merges all sstables assigned to a specified level into
     /// an sstable specified by filename
-    fn merge(
-        &mut self,
-        level_num: usize,
-        dirname: &str,
-        tablename: &str,
-    ) -> anyhow::Result<(), ()> {
+    fn merge(&mut self, level_num: usize, dirname: &str) -> Result<()> {
+        if level_num == self.levels.len() - 1 {
+            println!("Can't merge further");
+            return Ok(());
+        }
+
+        let previous = self.levels[level_num + 1].nodes.last();
+        let mut last = -1;
+        if let Some(filename) = previous {
+            if let Some(num) = filename.path.split("-").last() {
+                last = num.parse().context("parsing last")?;
+            }
+        }
+
+        let tablename = &format!("sstable-{}-{}", level_num + 1, last + 1);
+
+        println!("LAST: {last}");
+        println!("TABLE: {tablename}");
+
         let mut builder = sstable::SSTableBuilderSingleFile::new(
             dirname,
             tablename,
@@ -184,13 +290,14 @@ impl LSMTree {
             self.fp_prob,
             self.summary_nth,
         )
-        .unwrap();
+        .context("creating builder")?;
 
         let mut iterators: Vec<_> = self.levels[level_num]
             .nodes
             .iter()
             .map(|table| {
                 SSTableReaderSingleFile::load(&(format!("{}/{}", dirname, table.path)))
+                    .with_context(|| format!("loading {dirname}/{}", table.path))
                     .unwrap()
                     .iter()
                     .unwrap()
@@ -222,7 +329,9 @@ impl LSMTree {
                     if last_key.as_ref() == Some(&key) {
                         relevant_entries.push(Rc::clone(&entry_ref));
                     } else {
-                        if let Some(resolved_entry) = self.resolve_entries(&mut relevant_entries) {
+                        if let Some(resolved_entry) =
+                            self.resolve_entries(&mut relevant_entries, level_num)
+                        {
                             builder.insert_entry(&resolved_entry).unwrap();
                         }
                         relevant_entries.clear();
@@ -233,7 +342,9 @@ impl LSMTree {
                 None => {
                     // If there are no more entries, resolve the remaining entries
                     println!("Resolving remaining entries...\n");
-                    if let Some(resolved_entry) = self.resolve_entries(&mut relevant_entries) {
+                    if let Some(resolved_entry) =
+                        self.resolve_entries(&mut relevant_entries, level_num)
+                    {
                         builder.insert_entry(&resolved_entry).unwrap();
                     }
                     break; // Break when all iterators are exhausted
@@ -243,10 +354,27 @@ impl LSMTree {
 
         builder.finish_data().expect("finishing big sstable");
 
-        self.levels[level_num].nodes.clear();
-        self.levels[level_num + 1].nodes.push(TableNode {
-            path: String::from("sstable-1-0"),
+        // clear level and remove from disk
+        self.levels[level_num].nodes.iter().for_each(|node| {
+            let filename = node.path.clone();
+            let path = format!("{dirname}/{filename}");
+            //println!("Removing path");
+            remove_dir_all(path)
+                .context("removing {node.path}")
+                .unwrap();
         });
+
+        self.levels[level_num].nodes.clear();
+
+        self.levels[level_num + 1].nodes.push(TableNode {
+            path: String::from(tablename),
+        });
+
+        if self.levels[level_num + 1].nodes.len() >= self.size_threshold {
+            let msg = format!("MERGING RECURSE {level_num} -> {}", level_num + 1);
+            println!("{}", msg);
+            self.merge(level_num + 1, dirname).context(msg)?;
+        }
 
         Ok(())
     }
@@ -257,7 +385,8 @@ fn insert_range(
     dir: &str,
     lsm: &mut LSMTree,
     tombstone: bool,
-    base_filename: Option<String>,
+    auto_merge: bool,
+    base: &str,
 ) -> Result<(), ()> {
     // must sort entries
     let mut entries: Vec<String> = range.map(|i| i.to_string()).collect();
@@ -265,15 +394,20 @@ fn insert_range(
     entries.sort();
 
     let mut path;
-    if let Some(name) = base_filename {
-        path = format!("{}-0", name);
+    if base.is_empty() {
+        if tombstone {
+            path = String::from("tombs-0-0");
+        } else {
+            path = String::from("sstable-0-0");
+        }
     } else {
-        path = String::from("sstable-0");
+        path = String::from(format!("{base}-0-0"));
     }
 
     let mut builder = sstable::SSTableBuilderSingleFile::new(dir, &path, 100, 0.1, 10)
         .expect("creating a sstable");
 
+    println!("created builder: {dir}/{path}");
     for (idx, key) in entries.iter().enumerate() {
         let val;
         let timestmp;
@@ -302,24 +436,49 @@ fn insert_range(
 
         // finish previous and start new
         if idx % 100 == 0 {
-            builder.finish_data().expect("finishing big sstable");
+            builder
+                .finish_data()
+                .context(format!("finishing sstable {dir}/{path}"))
+                .unwrap();
+            println!("finished builder: {dir}/{path}");
 
-            lsm.insert(&path);
+            if auto_merge {
+                lsm.insert(&path)
+                    .context(format!("inserting sstable {dir}/{path}"))
+                    .unwrap();
+            } else {
+                lsm.append_table(&path)
+                    .context(format!("inserting sstable {dir}/{path}"))
+                    .unwrap();
+            }
+            println!("inserted sstable: {dir}/{path}");
 
             if tombstone {
-                path = format!("sstable-tombstones-{}", idx);
+                path = format!("tombs-0-{}", idx / 100);
             } else {
-                path = format!("sstable{}", idx);
+                path = format!("sstable-0-{}", idx / 100);
             }
 
             builder = sstable::SSTableBuilderSingleFile::new(dir, &path, 100, 0.1, 10)
-                .expect("creating a sstable");
+                .context(format!("opening sstable {dir}/{path}"))
+                .unwrap();
+            println!("created builder: {dir}/{path}");
         }
     }
 
     builder.finish_data().expect("finishing big sstable");
+    println!("finished builder: {dir}/{path}");
 
-    lsm.insert(&path);
+    if auto_merge {
+        lsm.insert(&path)
+            .context(format!("inserting sstable {dir}/{path}"))
+            .unwrap();
+    } else {
+        lsm.append_table(&path)
+            .context(format!("inserting sstable {dir}/{path}"))
+            .unwrap();
+    }
+    println!("inserted {path}");
 
     Ok(())
 }
@@ -382,9 +541,9 @@ fn lsm_insert() -> Result<(), ()> {
     let test_path = "test-data/lsm-insert";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path));
+    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
 
-    insert_range(&mut (0..1000), test_path, &mut lsm, false, None)
+    insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "")
 }
 
 #[test]
@@ -392,9 +551,9 @@ fn lsm_read() -> Result<(), ()> {
     let test_path = "./test-data/lsm-read";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path));
+    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
 
-    insert_range(&mut (0..1000), test_path, &mut lsm, false, None).unwrap();
+    insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
     let keys: Vec<&str> = vec![
         "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
@@ -459,11 +618,11 @@ fn lsm_merge_simple() {
     let test_path = "./test-data/lsm-merge-simple";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path));
+    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
 
-    insert_range(&mut (0..1000), test_path, &mut lsm, false, None).unwrap();
+    insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
-    lsm.merge(0, test_path, "sstable-1-0").unwrap();
+    lsm.merge(0, test_path).unwrap();
 
     let keys: Vec<&str> = vec![
         "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
@@ -526,9 +685,9 @@ fn lsm_merge_tombstones() {
     let test_path = "./test-data/lsm-merge-tombstones";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path));
+    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
 
-    insert_range(&mut (0..1000), test_path, &mut lsm, false, None).unwrap();
+    insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
     let t = lsm.count_tables(0);
     let t = lsm.count_tables(1);
@@ -549,16 +708,9 @@ fn lsm_merge_tombstones() {
     are_tombstones!(lsm, keys, false);
 
     // tombstones
-    insert_range(
-        &mut (501..600),
-        test_path,
-        &mut lsm,
-        true,
-        Some(String::from("tombstones")),
-    )
-    .unwrap();
+    insert_range(&mut (501..600), test_path, &mut lsm, true, false, "").unwrap();
 
-    lsm.merge(0, test_path, "sstable-1-0").unwrap();
+    lsm.merge(0, test_path).unwrap();
 
     let keys = vec![
         "501", "589", "534", "567", "590", "501", "545", "578", "523", "532", "565", "510", "543",
@@ -578,13 +730,13 @@ fn lsm_merge_tombstones() {
 }
 
 #[test]
-fn lsm_merge_propagate_tombstones() {
-    let test_path = "./test-data/lsm-merge-propagate-tombstones";
+fn lsm_merge_mix_tomb() {
+    let test_path = "./test-data/lsm-merge-mix-tomb";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path));
+    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
 
-    insert_range(&mut (0..1000), test_path, &mut lsm, false, None).unwrap();
+    insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
     let t = lsm.count_tables(0);
     let t = lsm.count_tables(1);
@@ -602,15 +754,23 @@ fn lsm_merge_propagate_tombstones() {
     ];
 
     keys_exist!(lsm, keys.clone(), true);
-    are_tombstones!(lsm, keys, false);
+    are_tombstones!(lsm, keys, false); // this is reduntant now ?
 
-    // tombstones to apply
-    insert_range(&mut (501..600), test_path, &mut lsm, true, Some(String::from("tombs_applied"))).unwrap();
+    // tombstones for existing entries
+    insert_range(&mut (501..600), test_path, &mut lsm, true, false, "applied").unwrap();
 
-    // tombstones to propagate
-    insert_range(&mut (2001..2100), test_path, &mut lsm, true, Some(String::from("tombs_propagated"))).unwrap();
+    // tombstones for fun
+    insert_range(
+        &mut (2001..2100),
+        test_path,
+        &mut lsm,
+        true,
+        false,
+        "propagated",
+    )
+    .unwrap();
 
-    lsm.merge(0, test_path, "sstable-1-0").unwrap();
+    lsm.merge(0, test_path).unwrap();
 
     let keys = vec![
         "501", "589", "534", "567", "590", "501", "545", "578", "523", "532", "565", "510", "543",
@@ -627,21 +787,99 @@ fn lsm_merge_propagate_tombstones() {
     ];
     keys_exist!(lsm, keys, true);
 
-    // propagated tombstones
+    // goofy tombstones
     let keys: Vec<&str> = vec![
         "2087", "2054", "2021", "2045", "2078", "2071", "2034", "2067", "2090", "2023", "2056",
         "2089", "2032", "2065", "2010", "2043", "2076", "2099", "2087", "2054", "2021", "2045",
         "2078", "2010", "2034", "2067", "2090", "2023",
     ];
+
+    // keys_exist!(false) == doesn't exist, or is tombstone because
+    // both failed searches and found tombstones return None
+    keys_exist!(lsm, keys.clone(), false);
+    
+    assert_eq!(lsm.get(Vec::from("2002")), None);
+
+    assert_eq!(lsm.get(Vec::from("2012")), None);
+
+    assert_eq!(lsm.get(Vec::from("2021")), None);
+}
+
+#[test]
+fn lsm_merge_mix_tomb_auto() {
+    let test_path = "./test-data/lsm-merge-mix-tomb-auto";
+    redo_dirs!(test_path);
+
+    let mut lsm = LSMTree::new(100, 0.1, 10, String::from(test_path), 3);
+
+    insert_range(&mut (0..700), test_path, &mut lsm, false, true, "").unwrap();
+
+    let keys = vec![
+        "456", "469", "234", "567", "690", "421", "345", "648", "123", "432", "465", "210", "543",
+        "646", "109", "687", "654", "321", "345", "648", "301", "234", "567", "690", "123", "456",
+        "469", "432", "465", "210", "543", "646", "109", "267", "654", "321", "345", "648", "301",
+        "234", "567", "690", "123",
+    ];
+
     keys_exist!(lsm, keys.clone(), true);
-    are_tombstones!(lsm, keys, true);
 
-    let tombstone = lsm.get(Vec::from("2002")).unwrap();
-    assert_eq!(tombstone.value, None);
+    // tombstones for existing keys
+    insert_range(&mut (201..300), test_path, &mut lsm, true, true, "applied").unwrap();
 
-    let tombstone = lsm.get(Vec::from("2012")).unwrap();
-    assert_eq!(tombstone.value, None);
+    // tombstones for fun
+    insert_range(
+        &mut (2001..2100),
+        test_path,
+        &mut lsm,
+        true,
+        true,
+        "propagated",
+    )
+    .unwrap();
 
-    let tombstone = lsm.get(Vec::from("2021")).unwrap();
-    assert_eq!(tombstone.value, None);
+    lsm.levels
+        .iter()
+        .enumerate()
+        .map(|(idx, l)| {
+            (
+                idx,
+                l.nodes.iter().map(|n| n.path.clone()).collect::<Vec<_>>(),
+            )
+        })
+        .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
+
+    // print_table(test_path, &lsm, 1, 0);
+    // print_table(test_path, &lsm, 2, 0);
+
+    // deleted 
+    let keys = vec![
+        "201", "289", "234", "267", "290", "201", "242", "278", "223", "232", "262", "210", "243",
+        "276", "209", "287", "224", "221", "242", "278", "201", "234", "267", "290", "223", "226",
+        "289", "232", "262", "210", "243", "276", "209", "287", "224", "221", "242", "278", "201",
+        "234", "267", "290", "223", "299",
+    ];
+    keys_exist!(lsm, keys.clone(), false);
+
+    // kept
+    let keys: Vec<&str> = vec![
+        "0", "1", "4", "7", "3", "9", "54", "67", "12", "43", "76", "21", "54", "32", "76", "29",
+        "87", "54", "21", "45", "78", "71", "34", "67", "90", "23", "56", "89", "32", "65", "10",
+        "43", "76", "99", "87", "54", "21", "45", "78", "10", "34", "67", "90", "23",
+    ];
+    keys_exist!(lsm, keys, true);
+
+    // goofy tombstones
+    let keys: Vec<&str> = vec![
+        "2087", "2054", "2021", "2045", "2078", "2071", "2034", "2067", "2090", "2023", "2056",
+        "2089", "2032", "2065", "2010", "2043", "2076", "2099", "2087", "2054", "2021", "2045",
+        "2078", "2010", "2034", "2067", "2090", "2023",
+    ];
+
+    keys_exist!(lsm, keys.clone(), false);
+
+    assert_eq!(lsm.get(Vec::from("2002")), None);
+
+    assert_eq!(lsm.get(Vec::from("2012")), None);
+
+    assert_eq!(lsm.get(Vec::from("2021")), None);
 }
