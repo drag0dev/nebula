@@ -5,6 +5,7 @@ use anyhow::Result;
 use sstable::SSTableReaderSingleFile;
 use std::fs::create_dir;
 use std::fs::remove_dir_all;
+use std::fs::rename;
 use std::ops::Range;
 use std::path::Path;
 use std::rc::Rc;
@@ -61,6 +62,7 @@ pub struct LSMTree {
     summary_nth: u64, // idk
     data_dir: String,
     size_threshold: usize,
+    last_table: usize,
 }
 
 impl LSMTree {
@@ -82,13 +84,38 @@ impl LSMTree {
             summary_nth,
             data_dir,
             size_threshold,
+            last_table: 0,
         }
     }
 
-    // TODO:
-    // traverse tables backwards (newest to oldest)
-    // if you encounter a tombstone, stop looking
+    // NOTE:?
     // Can't use ? if func returns Option<T>
+    /// Tries to find an `Entry` base on the `key`
+    ///
+    /// Returns None if it encounters a tombstone
+    /// Returns None if it finds nothing even after a full traversal
+    /// # Examples:
+    /// ```
+    /// let dir = String::from("data");
+    ///
+    /// let mut lsm = LSMTree::new(
+    ///     100, // item_count: u64,
+    ///     0.1, // fp_prob: f64,
+    ///     10,  // summary_nth: u64,
+    ///     dir, // data_dir: String,
+    ///     3    // size_threshold: usize,
+    /// );
+    /// lsm.insert("new_sstable").unwrap();
+    ///
+    /// let key: Vec<u8> = Vec::from("joe");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// let key: Vec<u8> = Vec::from("mama");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// ```
     pub fn get(&self, key: Vec<u8>) -> Option<Entry> {
         for level in &self.levels {
             for table in &level.nodes.iter().rev().collect::<Vec<&TableNode>>() {
@@ -179,6 +206,7 @@ impl LSMTree {
         reader.iter().unwrap().collect::<Vec<_>>().len()
     }
 
+    /// Private function for appending the table names to each level
     fn append_table(&mut self, path: &str) -> Result<()> {
         let node = TableNode {
             path: String::from(path),
@@ -188,7 +216,7 @@ impl LSMTree {
         Ok(())
     }
 
-    fn insert(&mut self, path: &str) -> Result<()> {
+    fn _insert(&mut self, path: &str) -> Result<()> {
         self.append_table(path).context("appending table")?;
 
         self.levels
@@ -211,9 +239,60 @@ impl LSMTree {
         Ok(())
     }
 
-    // TODO: IF TOMBSTONE AT LAST (BOTTOM) LEVEL, JUST DELETE IT
-    // NOTE: VECTOR COULD FILL UP ALL MEMORY (IF USER INPUTS 10000000 SAME KEYS)
+    /// Inserts a new sstable into the LSM structure by passing a filepath
+    ///
+    /// # NOTE:
+    /// `path` is relative to the `data_dir` field of the instantiated LSMTree
+    /// Will probably die if the `path` is incorrect
+    ///
+    /// # NOTE:
+    /// Do _not_ pass `path` = "sstable-n-n" as it _will_ die
+    /// Pass anything else
+    ///
+    /// # Examples:
+    /// ```
+    /// let dir = String::from("data");
+    ///
+    /// let mut lsm = LSMTree::new(
+    ///     100, // item_count: u64,
+    ///     0.1, // fp_prob: f64,
+    ///     10,  // summary_nth: u64,
+    ///     dir, // data_dir: String,
+    ///     3    // size_threshold: usize,
+    /// );
+    /// lsm.insert("new_sstable").unwrap();
+    ///
+    /// let key: Vec<u8> = Vec::from("joe");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// let key: Vec<u8> = Vec::from("mama");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// ```
+    pub fn insert(&mut self, table_name: &str) -> Result<()> {
+        let path = format!("{}/{}", self.data_dir, table_name);
+
+        let new_idx = self.last_table + 1;
+
+        let new_name = format!("sstable-0-{}", new_idx);
+        let new_path = format!("{}/{}", self.data_dir, new_name);
+        // create_dir(&new_path).context("creating empty dir").unwrap();
+
+        rename(path, new_path).context("renaming sstable")?;
+
+        println!("okRENAMED {table_name}");
+
+        self.last_table += 1;
+
+        self._insert(&new_name)
+    }
+
     /// Function to resolve a sequence of entries with the same key
+    ///
+    /// # NOTE:
+    /// Not memory efficient, could fill memory up indefinitely
     fn resolve_entries(
         &mut self,
         entries: &mut Vec<Rc<Entry>>,
@@ -241,32 +320,12 @@ impl LSMTree {
             return Some(Rc::clone(entry));
         }
         None
-
-        // let mut stack: Vec<Rc<Entry>> = vec![];
-
-        // Iterate through the sorted entries and the last non-tombstone
-        // entry that isn't succeeded by a tombstone entry is returned
-        //for entry in entries {
-        //    // if tombstone
-        //    if entry.value.is_none() {
-        //        // if empty or all tombstones
-        //        if stack.is_empty() || stack.iter().all(|e| e.value == None) {
-        //            stack.push(Rc::clone(entry));
-        //        } else {
-        //            stack.pop();
-        //        }
-        //    } else {
-        //        stack.push(Rc::clone(entry));
-        //    }
-        //}
-        //stack.pop()
     }
 
     /// Merges all sstables assigned to a specified level into
     /// an sstable specified by filename
     fn merge(&mut self, level_num: usize, dirname: &str) -> Result<()> {
         if level_num == self.levels.len() - 1 {
-            println!("Can't merge further");
             return Ok(());
         }
 
@@ -279,9 +338,6 @@ impl LSMTree {
         }
 
         let tablename = &format!("sstable-{}-{}", level_num + 1, last + 1);
-
-        println!("LAST: {last}");
-        println!("TABLE: {tablename}");
 
         let mut builder = sstable::SSTableBuilderSingleFile::new(
             dirname,
@@ -358,7 +414,6 @@ impl LSMTree {
         self.levels[level_num].nodes.iter().for_each(|node| {
             let filename = node.path.clone();
             let path = format!("{dirname}/{filename}");
-            //println!("Removing path");
             remove_dir_all(path)
                 .context("removing {node.path}")
                 .unwrap();
@@ -396,12 +451,12 @@ fn insert_range(
     let mut path;
     if base.is_empty() {
         if tombstone {
-            path = String::from("tombs-0-0");
+            path = String::from("test-tombs-0-0");
         } else {
-            path = String::from("sstable-0-0");
+            path = String::from("test-sstable-0-0");
         }
     } else {
-        path = String::from(format!("{base}-0-0"));
+        path = String::from(format!("test-{base}-0-0"));
     }
 
     let mut builder = sstable::SSTableBuilderSingleFile::new(dir, &path, 100, 0.1, 10)
@@ -428,7 +483,8 @@ fn insert_range(
 
         builder
             .insert_entry(&entry)
-            .expect("inserting entry into the sstable");
+            .context("inserting entry into the sstable")
+            .unwrap();
 
         if idx < 100 {
             continue;
@@ -454,9 +510,9 @@ fn insert_range(
             println!("inserted sstable: {dir}/{path}");
 
             if tombstone {
-                path = format!("tombs-0-{}", idx / 100);
+                path = format!("test-tombs-0-{}", idx / 100);
             } else {
-                path = format!("sstable-0-{}", idx / 100);
+                path = format!("test-sstable-0-{}", idx / 100);
             }
 
             builder = sstable::SSTableBuilderSingleFile::new(dir, &path, 100, 0.1, 10)
@@ -797,7 +853,7 @@ fn lsm_merge_mix_tomb() {
     // keys_exist!(false) == doesn't exist, or is tombstone because
     // both failed searches and found tombstones return None
     keys_exist!(lsm, keys.clone(), false);
-    
+
     assert_eq!(lsm.get(Vec::from("2002")), None);
 
     assert_eq!(lsm.get(Vec::from("2012")), None);
@@ -851,7 +907,7 @@ fn lsm_merge_mix_tomb_auto() {
     // print_table(test_path, &lsm, 1, 0);
     // print_table(test_path, &lsm, 2, 0);
 
-    // deleted 
+    // deleted
     let keys = vec![
         "201", "289", "234", "267", "290", "201", "242", "278", "223", "232", "262", "210", "243",
         "276", "209", "287", "224", "221", "242", "278", "201", "234", "267", "290", "223", "226",
