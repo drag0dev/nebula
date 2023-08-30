@@ -127,7 +127,7 @@ impl SSTableBuilderSingleFile {
             .context("cloning the reader file fd for data")?;
 
         let mut data_iter = SSTableIteratorSingleFile::iter(reader_fd, self.header.data_offset, self.header.filter_offset);
-        let mut index_offset = 0;
+        let mut index_offset = self.header.data_offset;
         let mut next_entry;
 
         // first iteration outside of a loop in order for entry to be initialized for

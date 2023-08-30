@@ -12,6 +12,16 @@ pub struct SSTableConfig {
 
 #[derive(PartialEq)]
 pub enum FileOrganization {
-    SingleFile,
-    MultipleFiles,
+    SingleFile(()),
+    MultiFile(()),
 }
+
+#[derive(PartialEq)]
+pub struct SF(());
+
+#[derive(PartialEq)]
+pub struct MF(());
+
+pub trait LSMTreeUnderlying {}
+impl LSMTreeUnderlying for SF {}
+impl LSMTreeUnderlying for MF {}

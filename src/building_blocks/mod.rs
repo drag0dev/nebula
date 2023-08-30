@@ -34,13 +34,13 @@ mod sstable;
 mod skip_list;
 mod merkle_tree;
 mod b_tree;
-mod merkle_tree;
+mod lsmtree;
+mod simhash;
 
 pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
 pub use hyperloglog::HyperLogLog;
 pub use count_min_sketch::CountMinSketch;
-pub use simhash::SimHash;
 pub use token_bucket::TokenBucket;
 pub use memtable::Memtable;
 pub use memtable::StorageCRUD;
@@ -52,10 +52,13 @@ pub use sstable::{
     SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile,
     SSTableBuilderSingleFile, SSTableReaderSingleFile, SSTableIteratorSingleFile
 };
+
+
 pub use skip_list::SkipList;
 pub use skip_list::SkipListNode;
 pub use merkle_tree::MerkleNode;
 pub use merkle_tree::MerkleRoot;
 pub use b_tree::BTree;
-pub use merkle_tree::MerkleNode;
-pub use merkle_tree::MerkleRoot;
+pub use simhash::SimHash;
+pub use simhash::similarity;
+pub use simhash::hamming_distance;

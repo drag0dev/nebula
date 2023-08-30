@@ -116,7 +116,7 @@ where
             .map(|e| &**e).collect::<Vec<_>>();
         merge_sort(&mut entries);
 
-        if self.sstable_type == FileOrganization::SingleFile {
+        if self.sstable_type == FileOrganization::SingleFile(()) {
             let mut builder = SSTableBuilderSingleFile::new(
                 &self.data_folder,
                 "memtable", entries.len() as u64,
