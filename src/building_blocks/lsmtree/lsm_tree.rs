@@ -22,6 +22,5 @@ pub struct LSMTree<S: LSMTreeUnderlying> {
     pub(super) data_dir: String,
     pub(super) size_threshold: usize,
     pub(super) last_table: usize,
-    pub(super) tables_item_counts: Vec<u64>,
     pub(super) marker: std::marker::PhantomData<S>,
 }

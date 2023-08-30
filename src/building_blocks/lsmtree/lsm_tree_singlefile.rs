@@ -14,21 +14,21 @@ impl LSMTree<SF> {
         summary_nth: u64,
         data_dir: String,
         size_threshold: usize,
+        number_of_levels: usize,
     ) -> Self {
 
         let marker: std::marker::PhantomData<SF> = Default::default();
+        let mut levels = vec![];
+        for _ in 0..number_of_levels {
+            levels.push(Level { nodes: vec![] });
+        }
         LSMTree {
-            levels: vec![
-                Level { nodes: vec![] },
-                Level { nodes: vec![] },
-                Level { nodes: vec![] },
-            ],
+            levels,
             fp_prob,
             summary_nth,
             data_dir,
             size_threshold,
             last_table: 0,
-            tables_item_counts: vec![],
             marker,
         }
     }
@@ -48,6 +48,7 @@ impl LSMTree<SF> {
     ///     10,  // summary_nth: u64,
     ///     dir, // data_dir: String,
     ///     3    // size_threshold: usize,
+    ///     3    // number_of_levels: usize,
     /// );
     /// lsm.insert("new_sstable").unwrap();
     ///
@@ -189,11 +190,8 @@ impl LSMTree<SF> {
 
         let new_name = format!("sstable-0-{}", new_idx);
         let new_path = format!("{}/{}", self.data_dir, new_name);
-        // create_dir(&new_path).context("creating empty dir").unwrap();
 
         rename(path, new_path).context("renaming sstable")?;
-
-        println!("okRENAMED {table_name}");
 
         self.last_table += 1;
 

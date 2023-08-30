@@ -17,9 +17,8 @@ fn insert_range(
     auto_merge: bool,
     base: &str,
 ) -> Result<(), ()> {
-    // must sort entries
+    // must sort entries 
     let mut entries: Vec<String> = range.map(|i| i.to_string()).collect();
-
     entries.sort();
 
     let mut path;
@@ -167,21 +166,21 @@ macro_rules! keys_exist {
 }
 
 #[test]
-fn lsm_insert() -> Result<(), ()> {
-    let test_path = "test-data/lsm-insert";
+fn lsm_insert_multi() -> Result<(), ()> {
+    let test_path = "test-data/lsm-insert-multi";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "")
 }
 
 #[test]
-fn lsm_read() -> Result<(), ()> {
-    let test_path = "./test-data/lsm-read";
+fn lsm_read_multi() -> Result<(), ()> {
+    let test_path = "./test-data/lsm-read-multi";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -244,11 +243,11 @@ fn lsm_read() -> Result<(), ()> {
 }
 
 #[test]
-fn lsm_merge_simple() {
-    let test_path = "./test-data/lsm-merge-simple";
+fn lsm_merge_simple_multi() {
+    let test_path = "./test-data/lsm-merge-simple-multi";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -311,11 +310,11 @@ fn lsm_merge_simple() {
 }
 
 #[test]
-fn lsm_merge_tombstones() {
-    let test_path = "./test-data/lsm-merge-tombstones";
+fn lsm_merge_tombstones_multi() {
+    let test_path = "./test-data/lsm-merge-tombstones-multi";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -360,11 +359,11 @@ fn lsm_merge_tombstones() {
 }
 
 #[test]
-fn lsm_merge_mix_tomb() {
-    let test_path = "./test-data/lsm-merge-mix-tomb";
+fn lsm_merge_mix_tomb_multi() {
+    let test_path = "./test-data/lsm-merge-mix-tomb-multi";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
 
     insert_range(&mut (0..1000), test_path, &mut lsm, false, false, "").unwrap();
 
@@ -436,11 +435,11 @@ fn lsm_merge_mix_tomb() {
 }
 
 #[test]
-fn lsm_merge_mix_tomb_auto() {
-    let test_path = "./test-data/lsm-merge-mix-tomb-auto";
+fn lsm_merge_mix_tomb_auto_multi() {
+    let test_path = "./test-data/lsm-merge-mix-tomb-auto-multi";
     redo_dirs!(test_path);
 
-    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3);
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
 
     insert_range(&mut (0..700), test_path, &mut lsm, false, true, "").unwrap();
 
