@@ -3,7 +3,7 @@ use std::{
     io::{Write, Seek, SeekFrom}, rc::Rc
 };
 use anyhow::{Result, Context};
-use crate::building_blocks::{MemtableEntry, Entry, IndexBuilder, SummaryBuilder, BloomFilter};
+use crate::building_blocks::{Entry, IndexBuilder, SummaryBuilder, BloomFilter, MerkleRoot};
 use super::{SSTableHeader, SSTableIteratorSingleFile, IndexIteratorSingleFile};
 
 /// SSTable builder where aiding structures are in the same file as the data itself
@@ -16,8 +16,8 @@ use super::{SSTableHeader, SSTableIteratorSingleFile, IndexIteratorSingleFile};
 /// sstable header
 /// data
 /// filter
+/// metadata
 /// index
-/// metadata ?
 /// summary
 /// ----------------------
 /// this way of creating a single file sstable is very slow due to a lot of IO ops
@@ -94,10 +94,8 @@ impl SSTableBuilderSingleFile {
         self.filter.write_to_file(&mut self.writer_file)
             .context("writing the filter")?;
 
-        // writer_file is flushed so that reader file can seek to the written data
-        // when generating the index
-        self.writer_file.sync_all()
-            .context("syncing the sstable file")?;
+        self.generate_meta()
+            .context("generating the metadata")?;
 
         self.generate_index()
             .context("generating the index")?;
@@ -107,6 +105,36 @@ impl SSTableBuilderSingleFile {
 
         self.finish()
             .context("finishing the sstable file")?;
+
+        Ok(())
+    }
+
+    fn generate_meta(&mut self) -> Result<()> {
+        let meta_offset = self.writer_file.stream_position()
+            .context("getting current file position")?;
+        self.header.meta_offset = meta_offset;
+
+        self.reader_file.seek(SeekFrom::Start(self.header.data_offset))
+            .context("seeking reader file to data")?;
+        let reader_fd = self.reader_file.try_clone()
+            .context("cloning the reader file fd for data")?;
+
+        let data_iter = SSTableIteratorSingleFile::iter(reader_fd, self.header.data_offset, self.header.filter_offset);
+        let mut data = Vec::with_capacity(self.filter.item_count as usize);
+        for entry in data_iter {
+            let entry = entry.context("reading sstable entry")?;
+            let value = if let Some(val) = entry.value { val } else { [].to_vec() };
+            data.push(value);
+        }
+
+        let merkle = MerkleRoot::new(data)
+            .serialize()?;
+
+        self.writer_file.write_all(&merkle)
+            .context("writing merkle root")?;
+
+        self.writer_file.sync_all()
+            .context("syncing the sstable file")?;
 
         Ok(())
     }
@@ -215,8 +243,6 @@ impl SSTableBuilderSingleFile {
         self.writer_file.sync_all()
             .context("syncing the sstable file")?;
 
-        self.writer_file.sync_all()
-            .context("syncing the sstable file")?;
         Ok(())
     }
 }
