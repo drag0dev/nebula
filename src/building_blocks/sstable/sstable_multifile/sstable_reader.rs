@@ -10,7 +10,7 @@ pub struct SSTableReaderMultiFile {
     pub filter: BloomFilter,
     index_file: File,
     summary_file: File,
-    // metadata: ?,
+    metadata_file: File,
     sstable_file: File,
 }
 
@@ -31,11 +31,16 @@ impl SSTableReaderMultiFile {
         let sstable_file = open_file(sstabel_dir, "data")
             .context("opening data file")?;
 
+        let metadata_file = open_file(sstabel_dir, "metadata")
+            .context("opening metadata file")?;
+
+
         Ok(SSTableReaderMultiFile {
             filter,
             index_file,
             summary_file,
             sstable_file,
+            metadata_file
         })
     }
 

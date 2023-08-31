@@ -4,21 +4,22 @@ use std::{
         create_dir,
         OpenOptions
     },
-    io::Write,
+    io::{Write, Seek},
     rc::Rc
 };
 use anyhow::{Result, Context};
 use crate::building_blocks::{
     SummaryBuilder,
     IndexBuilder,
-    Entry, BloomFilter
+    Entry, BloomFilter, MerkleRoot
 };
+use super::SSTableIteratorMultiFile;
 
 /// SSTable builder where aiding structures are in a separate files
 pub struct SSTableBuilderMultiFile {
     index: IndexBuilder,
     summary: SummaryBuilder,
-    //metadata: ?,
+    metadata_file: File,
     filter: BloomFilter,
     filter_file: File,
     sstable_file: File,
@@ -50,7 +51,7 @@ impl SSTableBuilderMultiFile {
         let index_file = create_file(&dir_path, "index")?;
         let summary_file = create_file(&dir_path, "summary")?;
         let filter_file = create_file(&dir_path, "filter")?;
-        // let metadata_file = create_file(&dir_path, "metadata")?;
+        let metadata_file = create_file(&dir_path, "metadata")?;
 
         let index = IndexBuilder::new(index_file);
         let summary = SummaryBuilder::new(summary_file);
@@ -59,6 +60,7 @@ impl SSTableBuilderMultiFile {
         Ok(SSTableBuilderMultiFile {
             index,
             summary,
+            metadata_file,
             filter,
             filter_file,
             sstable_file,
@@ -131,6 +133,12 @@ impl SSTableBuilderMultiFile {
         self.filter.write_to_file(&mut self.filter_file)
             .context("writing filter to the file")?;
 
+        self.generate_meta()
+            .context("generating meta")?;
+
+        self.metadata_file.flush()
+            .context("flushing metadata to the file")?;
+
         self.sstable_file.flush()
             .context("flushing sstable to the file")?;
 
@@ -142,6 +150,26 @@ impl SSTableBuilderMultiFile {
         Ok(())
     }
 
+    fn generate_meta(&mut self) -> Result<()> {
+        self.sstable_file.rewind().context("rewinding sstable file")?;
+        let iter_fd = self.sstable_file.try_clone().context("cloning sstable file")?;
+        let iter = SSTableIteratorMultiFile::iter(iter_fd);
+
+        let mut data = Vec::with_capacity(self.filter.item_count as usize);
+        for entry in iter {
+            let entry = entry.context("reading sstable entry")?;
+            let value = if let Some(val) = entry.value { val } else { [].to_vec() };
+            data.push(value);
+        }
+
+        let merkle = MerkleRoot::new(data)
+            .serialize()?;
+
+        self.metadata_file.write_all(&merkle)
+            .context("writing merkle root")?;
+
+        Ok(())
+    }
 }
 
 fn create_file(dir: &str, file_name: &str) -> Result<File> {
@@ -149,6 +177,7 @@ fn create_file(dir: &str, file_name: &str) -> Result<File> {
         .create(true)
         .truncate(true)
         .write(true)
+        .read(true)
         .open(format!("{}/{}", dir, file_name))
         .context("creating sstable file")?;
     Ok(file)
