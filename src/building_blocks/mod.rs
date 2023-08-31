@@ -36,6 +36,7 @@ mod merkle_tree;
 mod b_tree;
 mod lsmtree;
 mod simhash;
+mod wal;
 
 pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
@@ -62,3 +63,4 @@ pub use b_tree::BTree;
 pub use simhash::SimHash;
 pub use simhash::similarity;
 pub use simhash::hamming_distance;
+pub use wal::WriteAheadLog;
