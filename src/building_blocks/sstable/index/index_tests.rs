@@ -15,14 +15,10 @@ fn writing() {
 
     let mut index_builder = IndexBuilder::new(file);
 
-    let mut offset = 0;
     for i in 0..10 {
-        let new_offset = index_builder.add(&i.to_string().into_bytes(), i)
+        index_builder.add(&i.to_string().into_bytes(), i)
             .expect("error adding index entry");
-        assert_eq!(new_offset, offset);
-        offset += 29;
     }
-    offset -= 29;
 
     // read by offsets
     let mut file = OpenOptions::new()
@@ -31,18 +27,15 @@ fn writing() {
         .expect("error opening 'valid-index-write'");
 
     // seek to the last offset
-    let pos = file.seek(std::io::SeekFrom::Start(offset)).expect("seeking in the 'valid-index-write'");
-    assert_eq!(pos, offset);
+    file.seek(std::io::SeekFrom::Start(0)).expect("seeking in the 'valid-index-write'");
 
-    let mut index_iter = IndexIterator::iter(file);
-    let entry = index_iter.next();
-    assert!(entry.is_some());
-    let entry = entry.unwrap();
-    assert!(entry.is_ok());
-    let entry = entry.unwrap();
+    let index_iter = IndexIterator::iter(file);
 
-    assert_eq!(entry.key, "9".to_string().into_bytes());
-    assert_eq!(entry.offset, 9);
+    for (i, entry) in index_iter.enumerate() {
+        let entry = entry.expect("reading index entry");
+        assert_eq!(entry.key, i.to_string().into_bytes());
+        assert_eq!(entry.offset, i as u64);
+    }
 }
 
 #[test]
