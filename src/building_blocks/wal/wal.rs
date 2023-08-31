@@ -2,7 +2,7 @@ use std::io::Write;
 use anyhow::{Result, Context};
 use memmap2::MmapMut;
 use crate::building_blocks::Entry;
-use super::{get_next_index_avaiable, create_file, purge_all_files};
+use super::{get_next_index, create_file, purge_all_files};
 
 pub struct WriteAheadLog {
     current_file: Option<MmapMut>,
@@ -57,7 +57,7 @@ impl WriteAheadLog {
     }
 
     fn generate_next_file(&mut self) -> Result<()> {
-        let next_index = get_next_index_avaiable(&self.path)
+        let next_index = get_next_index(&self.path)
             .context("getting the next index available")?;
 
         let current_file = unsafe {

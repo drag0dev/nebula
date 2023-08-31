@@ -5,14 +5,14 @@ use memmap2::MmapMut;
 
 /// reads the wal folder, checks that all files have a valid name
 /// returns index of the last file written + 1
-pub fn get_next_index_avaiable(wal_folder: &str) -> Result<usize> {
+pub fn get_next_index(wal_folder: &str) -> Result<usize> {
     let paths = read_dir(wal_folder)
         .context("reading wal folder")?;
     let file_names = get_valid_path_names(paths)?;
-    get_next_index(file_names)
+    get_next_index(&file_names)
 }
 
-fn get_valid_path_names(input: ReadDir) -> Result<Vec<String>> {
+pub fn get_valid_path_names(input: ReadDir) -> Result<Vec<String>> {
     let segment_name_re = Regex::new(r"^segment-\d+$").unwrap();
     let mut file_names = Vec::new();
 
@@ -40,7 +40,7 @@ fn get_valid_path_names(input: ReadDir) -> Result<Vec<String>> {
     Ok(file_names)
 }
 
-fn get_next_index(input: Vec<String>) -> Result<usize> {
+pub fn get_next_index_avaiable(input: &Vec<String>) -> Result<usize> {
     let mut indices: Vec<_> = input
         .iter()
         .map(|path| {
