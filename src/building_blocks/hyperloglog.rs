@@ -1,6 +1,11 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use anyhow::{Context, Result};
+use serde::{Serialize, Deserialize};
+use bincode::Options;
+use super::BINCODE_OPTIONS;
 
+#[derive(Serialize, Deserialize)]
 pub struct HyperLogLog{
     buckets: Vec<u8>,
     number_of_bits: u8,
@@ -73,10 +78,24 @@ impl HyperLogLog{
         }
         estimation
     }
+
+    pub fn serialize(&self) -> Result<Vec<u8>>{
+        Ok(BINCODE_OPTIONS
+            .serialize(&self)
+            .context("serializing hll")?)
+    }
+
+    pub fn deserialize(data: &[u8]) -> Result<Self>{
+        Ok(BINCODE_OPTIONS
+            .deserialize(data)
+            .context("deserializing hll")?)
+    }
 }
 
-// #[cfg(test)]
-// mod tests{
+#[cfg(test)]
+mod tests{
+    use super::HyperLogLog;
+
 //     use super::*;
 //     use rand::Rng;
 
@@ -120,6 +139,14 @@ impl HyperLogLog{
 
 //         println!("\nbest result:\nerror {best}% at {bits} bits\n");
 
+
 //         assert!(false);
 //     }
-// }
+
+    #[test]
+    fn ser_deser() {
+        let hll = HyperLogLog::new(10);
+        let hll_ser = hll.serialize().unwrap();
+        let hll_deser = HyperLogLog::deserialize(&hll_ser).unwrap();
+    }
+}
