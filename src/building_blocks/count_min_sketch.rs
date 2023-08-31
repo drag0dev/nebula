@@ -3,8 +3,11 @@ use anyhow::{Context, Result};
 use murmur3::murmur3_x64_128;
 use rand::Rng;
 use std::io::Cursor;
+use serde::{Deserialize, Serialize};
+use bincode::Options;
+use super::BINCODE_OPTIONS;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct CountMinSketch {
     /// the hash functions should be "pair-wise independent" (?)
@@ -102,6 +105,18 @@ impl CountMinSketch {
         }
         Ok(min)
     }
+
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(BINCODE_OPTIONS
+            .serialize(&self)
+            .context("serializing cms")?)
+    }
+
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        Ok(BINCODE_OPTIONS
+            .deserialize(data)
+            .context("deserializing cms")?)
+    }
 }
 
 #[cfg(test)]
@@ -177,5 +192,17 @@ mod tests {
 
         let val = cms.count("egg").unwrap();
         assert_eq!(val >= 1, true);
+    }
+
+    #[test]
+    fn ser_deser() {
+        let cms = CountMinSketch::new(0.1, 0.1);
+
+        let ser = cms.serialize();
+        assert!(ser.is_ok());
+        let ser = ser.unwrap();
+
+        let deser = CountMinSketch::deserialize(&ser);
+        assert!(deser.is_ok());
     }
 }
