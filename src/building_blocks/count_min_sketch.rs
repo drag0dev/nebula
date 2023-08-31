@@ -31,29 +31,11 @@ impl CountMinSketch {
         let mut column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
         column_count = closest_pow(column_count);
 
-        let seeds = match load_seeds("cms-seeds.txt") {
-            Some(seeds) => {
-                if hash_func_count != seeds.len() as u64 {
-                    println!("seeds: {}", seeds.len());
-                    println!("hash funcs: {}", hash_func_count);
-
-                    panic!("Number of hash functions has to match number of seeds!");
-                }
-                seeds
-            }
-
-            None => {
-                // generate n seeds
-                let mut seeds: Vec<u32> = Vec::with_capacity(hash_func_count as usize);
-                let mut rng = rand::thread_rng();
-                for _ in 0..hash_func_count {
-                    seeds.push(rng.gen());
-                }
-
-                write_seeds(&seeds, "cms-seeds.txt");
-                seeds
-            }
-        };
+        let mut seeds: Vec<u32> = Vec::with_capacity(hash_func_count as usize);
+        let mut rng = rand::thread_rng();
+        for _ in 0..hash_func_count {
+            seeds.push(rng.gen());
+        }
 
         let h = hash_func_count as usize;
         let w = column_count as usize;

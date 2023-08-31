@@ -14,43 +14,6 @@ pub fn closest_pow(n: u64) -> u64{
     1 << (64 - n.leading_zeros() - n.is_power_of_two() as u32)
 }
 
-pub fn load_seeds(filename: &str) -> Option<Vec<u32>>{
-    let file_contents = std::fs::read_to_string(filename);
-    if file_contents.is_err(){
-        return None
-    }else{
-        let file_contents = file_contents.unwrap();
-        let file_contents = file_contents.trim();
-        let mut seeds: Vec<u32> = Vec::with_capacity(file_contents.matches("\n").count());
-
-        for seed in file_contents.split("\n"){
-            let seed = seed.parse::<u32>();
-            if seed.is_err(){
-                panic!("error: parsing a seed \"{:?}\"", seed.err());
-            }else{
-                seeds.push(seed.unwrap());
-            }
-        }
-        return Some(seeds);
-    }
-}
-
-pub fn write_seeds(seeds: &Vec<u32>, filename: &str){
-    let file = std::fs::File::create(filename);
-    if file.is_err(){
-        panic!("error: creating \"seeds.txt\" file: \"{:?}\"", file.err());
-    }
-    let mut file = file.unwrap();
-    for s in seeds.iter(){
-        match file.write_all(format!("{}\n", s).as_bytes()){
-            Ok(_) => {},
-            Err(e) => {
-                panic!("error: writing a seed \"{}\"", e);
-            }
-        };
-    }
-}
-
 #[cfg(test)]
 mod tests{
     use super::*;
@@ -72,12 +35,5 @@ mod tests{
         assert_eq!(closest_pow(240), 256);
         assert_eq!(closest_pow(1000), 1024);
         assert_eq!(closest_pow(1024), 1024);
-    }
-    #[test]
-    fn writing_and_reading_seeds(){
-        write_seeds(&vec![1, 2, 3], "bf-seeds.txt");
-        assert_eq!(load_seeds("bf-seeds.txt").unwrap(), vec![1, 2, 3]);
-        write_seeds(&vec![111, 222, 333], "bf-seeds.txt");
-        assert_eq!(load_seeds("bf-seeds.txt").unwrap(), vec![111, 222, 333]);
     }
 }
