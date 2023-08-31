@@ -23,7 +23,6 @@ pub struct BloomFilter{
 }
 
 impl BloomFilter{
-    /// function will panic if number of hash functions and number of seeds does not match
     pub fn new(item_count: u64, fp_prob: f64) -> Self{
         // size = -(items * log(probability)) / (log(2)^2)
         let bit_arr_len = -((item_count as f64 * fp_prob.log(EULER_NUMBER)) /

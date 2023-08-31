@@ -28,7 +28,7 @@ impl IndexBuilder {
         IndexBuilder { file, index_offset: 0 }
     }
 
-    pub fn add(&mut self, key: &Vec<u8>, offset: u64) -> Result<u64> {
+    pub fn add(&mut self, key: &Vec<u8>, offset: u64) -> Result<()> {
         let entry = IndexEntry { key: key.clone(), offset };
         let entry_ser = BINCODE_OPTIONS
             .serialize(&entry)
@@ -55,15 +55,13 @@ impl IndexBuilder {
         self.file.write_all(&entry_ser)
             .context("writing index entry to the file")?;
 
-        let old_offset = self.index_offset;
-
         // offset moved by a single entry len
         self.index_offset +=
             len_ser.len() as u64 +
             crc_ser.len() as u64 +
             entry_ser.len() as u64;
 
-        Ok(old_offset)
+        Ok(())
     }
 
     pub fn finish(&mut self) -> Result<()> {
