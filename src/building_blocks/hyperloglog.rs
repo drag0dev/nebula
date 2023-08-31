@@ -146,7 +146,13 @@ mod tests{
     #[test]
     fn ser_deser() {
         let hll = HyperLogLog::new(10);
-        let hll_ser = hll.serialize().unwrap();
-        let hll_deser = HyperLogLog::deserialize(&hll_ser).unwrap();
+
+        let hll_ser = hll.serialize();
+        assert!(hll_ser.is_ok());
+        let hll_ser = hll_ser.unwrap();
+
+        let hll_deser = HyperLogLog::deserialize(&hll_ser);
+        assert!(hll_deser.is_ok());
     }
+
 }
