@@ -2,6 +2,7 @@
 bf-seeds.txt
 cms-seeds.txt
 test-data/
+<<<<<<< HEAD
 data/table_data/*
 data/WAL/*
 data/
