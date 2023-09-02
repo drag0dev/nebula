@@ -52,7 +52,9 @@ pub use sstable::{
     SummaryBuilder, SummaryEntry, SummaryIterator,
     SSTableConfig, FileOrganization,
     SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile,
-    SSTableBuilderSingleFile, SSTableReaderSingleFile, SSTableIteratorSingleFile
+    SSTableBuilderSingleFile, SSTableReaderSingleFile, SSTableIteratorSingleFile,
+    SF, MF
+
 };
 
 
@@ -66,3 +68,4 @@ pub use simhash::similarity;
 pub use simhash::hamming_distance;
 pub use wal::WriteAheadLog;
 pub use cache::Cache;
+pub use lsmtree::LSMTree;
