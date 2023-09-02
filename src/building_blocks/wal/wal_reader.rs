@@ -20,12 +20,12 @@ impl WriteAheadLogReader {
 
         let mut file_names = get_valid_path_names(paths)?;
         _ = get_next_index_avaiable(&file_names)
-            .context("check if ther are fils missing")?;
+            .context("check if ther are files missing")?;
 
         file_names.sort_unstable_by(|a, b| {
             let a_index = a.split('-').last().unwrap().parse::<u64>().unwrap();
             let b_index = b.split('-').last().unwrap().parse::<u64>().unwrap();
-            a.partial_cmp(b).unwrap()
+            a_index.partial_cmp(&b_index).unwrap()
         });
 
         Ok(WriteAheadLogReader {
@@ -70,7 +70,7 @@ impl Iterator for WriteAheadLogReader {
 }
 
 /// reads until it reaches end of the file or len 0
-pub fn read_entry(file: &mut File) -> Result<Option<Entry>> {
+fn read_entry(file: &mut File) -> Result<Option<Entry>> {
     let mut len_ser = vec![0; 8];
     let res = file.read_exact(&mut len_ser);
     if let Err(e) = res.as_ref() {

@@ -7,7 +7,7 @@ use super::{get_next_index, create_file, purge_all_files};
 pub struct WriteAheadLog {
     current_file: Option<MmapMut>,
 
-    // amount of bytes to the current file
+    // amount of bytes written to the current file
     current_file_len: usize,
 
     /// in bytes
@@ -34,7 +34,7 @@ impl WriteAheadLog {
     pub fn add(&mut self, entry: &Entry) -> Result<()> {
         let entry_ser = entry.serialize()?;
 
-        if (entry_ser.len() + self.current_file_len) as u64 > self.segment_size {
+        if (entry_ser.len() + self.current_file_len) as u64 > self.segment_size || self.current_file.is_none() {
             self.generate_next_file().context("creating a new segment")?;
         }
 
@@ -60,10 +60,8 @@ impl WriteAheadLog {
         let next_index = get_next_index(&self.path)
             .context("getting the next index available")?;
 
-        let current_file = unsafe {
-            create_file(&self.path, next_index, self.segment_size)
-                .context("creating a new file")?
-        };
+        let current_file = create_file(&self.path, next_index, self.segment_size)
+                .context("creating a new file")?;
 
         self.current_file = Some(current_file);
         self.current_file_len = 0;

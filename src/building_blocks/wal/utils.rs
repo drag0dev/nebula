@@ -9,7 +9,7 @@ pub fn get_next_index(wal_folder: &str) -> Result<usize> {
     let paths = read_dir(wal_folder)
         .context("reading wal folder")?;
     let file_names = get_valid_path_names(paths)?;
-    get_next_index(&file_names)
+    get_next_index_avaiable(&file_names)
 }
 
 pub fn get_valid_path_names(input: ReadDir) -> Result<Vec<String>> {
@@ -32,7 +32,7 @@ pub fn get_valid_path_names(input: ReadDir) -> Result<Vec<String>> {
         if file_meta.is_file() {
             file_names.push(file_name);
         } else {
-            let e = anyhow!("fs entry '{}' is not file", file_name);
+            let e = anyhow!("fs entry '{}' is not a file", file_name);
             return Err(e);
         }
     }
@@ -52,7 +52,7 @@ pub fn get_next_index_avaiable(input: &Vec<String>) -> Result<usize> {
     .collect();
     indices.sort_unstable();
 
-    // check if all indices exists
+    // check if all indices exist
     for (i, index) in indices.iter().enumerate() {
         if *index != i {
             let e = anyhow!("segment with index '{i}' is missing");
@@ -67,7 +67,7 @@ pub fn get_next_index_avaiable(input: &Vec<String>) -> Result<usize> {
     }
 }
 
-pub unsafe fn create_file(dir: &str, index: usize, file_size: u64) -> Result<MmapMut> {
+pub fn create_file(dir: &str, index: usize, file_size: u64) -> Result<MmapMut> {
     let file_name = format!("{dir}/segment-{index}");
 
     let file = std::fs::OpenOptions::new()
