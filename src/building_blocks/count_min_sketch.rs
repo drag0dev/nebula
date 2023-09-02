@@ -3,8 +3,11 @@ use anyhow::{Context, Result};
 use murmur3::murmur3_x64_128;
 use rand::Rng;
 use std::io::Cursor;
+use serde::{Deserialize, Serialize};
+use bincode::Options;
+use super::BINCODE_OPTIONS;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct CountMinSketch {
     /// the hash functions should be "pair-wise independent" (?)
@@ -31,29 +34,11 @@ impl CountMinSketch {
         let mut column_count = (EULER_NUMBER / desired_accuracy).ceil() as u64;
         column_count = closest_pow(column_count);
 
-        let seeds = match load_seeds("cms-seeds.txt") {
-            Some(seeds) => {
-                if hash_func_count != seeds.len() as u64 {
-                    println!("seeds: {}", seeds.len());
-                    println!("hash funcs: {}", hash_func_count);
-
-                    panic!("Number of hash functions has to match number of seeds!");
-                }
-                seeds
-            }
-
-            None => {
-                // generate n seeds
-                let mut seeds: Vec<u32> = Vec::with_capacity(hash_func_count as usize);
-                let mut rng = rand::thread_rng();
-                for _ in 0..hash_func_count {
-                    seeds.push(rng.gen());
-                }
-
-                write_seeds(&seeds, "cms-seeds.txt");
-                seeds
-            }
-        };
+        let mut seeds: Vec<u32> = Vec::with_capacity(hash_func_count as usize);
+        let mut rng = rand::thread_rng();
+        for _ in 0..hash_func_count {
+            seeds.push(rng.gen());
+        }
 
         let h = hash_func_count as usize;
         let w = column_count as usize;
@@ -119,6 +104,18 @@ impl CountMinSketch {
             hash_index += 1;
         }
         Ok(min)
+    }
+
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(BINCODE_OPTIONS
+            .serialize(&self)
+            .context("serializing cms")?)
+    }
+
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        Ok(BINCODE_OPTIONS
+            .deserialize(data)
+            .context("deserializing cms")?)
     }
 }
 
@@ -195,5 +192,17 @@ mod tests {
 
         let val = cms.count("egg").unwrap();
         assert_eq!(val >= 1, true);
+    }
+
+    #[test]
+    fn ser_deser() {
+        let cms = CountMinSketch::new(0.1, 0.1);
+
+        let ser = cms.serialize();
+        assert!(ser.is_ok());
+        let ser = ser.unwrap();
+
+        let deser = CountMinSketch::deserialize(&ser);
+        assert!(deser.is_ok());
     }
 }
