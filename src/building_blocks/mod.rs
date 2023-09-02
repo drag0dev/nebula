@@ -37,6 +37,7 @@ mod b_tree;
 mod lsmtree;
 mod simhash;
 mod wal;
+mod cache;
 
 pub use entry::Entry;
 pub use bloomfilter::BloomFilter;
@@ -64,3 +65,4 @@ pub use simhash::SimHash;
 pub use simhash::similarity;
 pub use simhash::hamming_distance;
 pub use wal::WriteAheadLog;
+pub use cache::Cache;
