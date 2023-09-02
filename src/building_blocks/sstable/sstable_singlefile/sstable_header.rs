@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use anyhow::{Result, Context};
 use crate::building_blocks::BINCODE_OPTIONS;
 
-pub static HEADER_SIZE: u64 = 32;
+pub static HEADER_SIZE: u64 = 40;
 
 /// all the offsets are the offsets from the beginning from the file including the header
 /// itself
@@ -14,6 +14,7 @@ pub struct SSTableHeader {
     pub filter_offset: u64,
     pub index_offset: u64,
     pub summary_offset: u64,
+    pub meta_offset: u64,
 }
 
 impl SSTableHeader {
@@ -23,6 +24,7 @@ impl SSTableHeader {
             filter_offset: 0,
             index_offset: 0,
             summary_offset: 0,
+            meta_offset: 0
         }
     }
 

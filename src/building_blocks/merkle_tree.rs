@@ -2,6 +2,9 @@ use serde::{Serialize, Deserialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::fmt;
+use anyhow::{Result, Context};
+use super::BINCODE_OPTIONS;
+use bincode::Options;
 
 // Define the MerkleNode structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +75,18 @@ impl MerkleRoot {
 
     pub fn get_root_hash(&self) -> Option<&Vec<u8>> {
         self.root.as_ref()
+    }
+
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(BINCODE_OPTIONS
+            .serialize(&self)
+            .context("serializing merkle tree")?)
+    }
+
+    pub fn deserialize(data: &[u8]) -> Result<MerkleRoot> {
+        Ok(BINCODE_OPTIONS
+            .deserialize(data)
+            .context("deserializing merkle tree")?)
     }
 }
 
