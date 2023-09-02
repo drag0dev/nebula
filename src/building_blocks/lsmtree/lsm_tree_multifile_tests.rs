@@ -35,7 +35,7 @@ fn insert_range(
     let mut builder = SSTableBuilder::new(dir, &path, 100, 0.1, 10)
         .expect("creating a sstable");
 
-    println!("created builder: {dir}/{path}");
+    // println!("created builder: {dir}/{path}");
     for (idx, key) in entries.iter().enumerate() {
         let val;
         let timestmp;
@@ -69,7 +69,7 @@ fn insert_range(
                 .finish()
                 .context(format!("finishing sstable {dir}/{path}"))
                 .unwrap();
-            println!("finished builder: {dir}/{path}");
+            // println!("finished builder: {dir}/{path}");
 
             if auto_merge {
                 lsm.insert(&path)
@@ -80,7 +80,7 @@ fn insert_range(
                     .context(format!("inserting sstable {dir}/{path}"))
                     .unwrap();
             }
-            println!("inserted sstable: {dir}/{path}");
+            // println!("inserted sstable: {dir}/{path}");
 
             if tombstone {
                 path = format!("test-tombs-0-{}", idx / 100);
@@ -91,12 +91,12 @@ fn insert_range(
             builder = SSTableBuilder::new(dir, &path, 100, 0.1, 10)
                 .context(format!("opening sstable {dir}/{path}"))
                 .unwrap();
-            println!("created builder: {dir}/{path}");
+            // println!("created builder: {dir}/{path}");
         }
     }
 
     builder.finish().expect("finishing big sstable");
-    println!("finished builder: {dir}/{path}");
+    // println!("finished builder: {dir}/{path}");
 
     if auto_merge {
         lsm.insert(&path)
@@ -107,7 +107,7 @@ fn insert_range(
             .context(format!("inserting sstable {dir}/{path}"))
             .unwrap();
     }
-    println!("inserted {path}");
+    // println!("inserted {path}");
 
     Ok(())
 }
@@ -511,4 +511,68 @@ fn lsm_merge_mix_tomb_auto_multi() {
     assert_eq!(lsm.get(Vec::from("2012")), None);
 
     assert_eq!(lsm.get(Vec::from("2021")), None);
+}
+
+#[test]
+fn lsm_load_multi() -> Result<()> {
+    let test_path = "./test-data/lsm-load-multi";
+    redo_dirs!(test_path);
+
+    let mut lsm = LSMTree::<MF>::new(0.1, 10, String::from(test_path), 3, 3);
+
+    insert_range(&mut (0..1000), test_path, &mut lsm, false, true, "").unwrap();
+
+    lsm.levels
+        .iter()
+        .enumerate()
+        .map(|(idx, l)| {
+            (
+                idx,
+                l.nodes.iter().map(|n| n.path.clone()).collect::<Vec<_>>(),
+            )
+        })
+        .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
+    
+        println!("CLEARIND");
+    lsm.levels.clear();
+        println!("CLEARED");
+
+    lsm.levels
+        .iter()
+        .enumerate()
+        .map(|(idx, l)| {
+            (
+                idx,
+                l.nodes.iter().map(|n| n.path.clone()).collect::<Vec<_>>(),
+            )
+        })
+        .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
+
+        println!("LOADING... ");
+
+    lsm.load().context("loading data")?;
+        println!("LOADED ");
+
+    println!("lelvls {:?}", lsm.levels);
+
+    lsm.levels
+        .iter()
+        .enumerate()
+        .map(|(idx, l)| {
+            (
+                idx,
+                l.nodes.iter().map(|n| n.path.clone()).collect::<Vec<_>>(),
+            )
+        })
+        .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
+
+    let keys: Vec<&str> = vec![
+        "456", "789", "234", "567", "890", "901", "345", "678", "123", "432", "765", "210", "543",
+        "876", "109", "987", "654", "321", "345", "678", "901", "234", "567", "890", "123", "456",
+        "789", "432", "765", "210", "543", "876", "109", "987", "654", "321", "345", "678", "901",
+        "234", "567", "890", "123",
+    ];
+    keys_exist!(lsm, keys, true);
+
+    Ok(())
 }

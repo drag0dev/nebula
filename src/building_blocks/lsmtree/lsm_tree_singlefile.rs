@@ -1,12 +1,13 @@
 // TODO: replace the unwraps with context()? if I have the time
-use anyhow::{Context, Result};
+use super::{LSMTree, Level, TableNode};
 use crate::building_blocks::sstable::{
-    SSTableReaderSingleFile as SSTableReader,
-    SSTableBuilderSingleFile as SSTableBuilder, SF};
+    SSTableBuilderSingleFile as SSTableBuilder, SSTableReaderSingleFile as SSTableReader, SF,
+};
 use crate::building_blocks::Entry;
+use anyhow::{Context, Result};
 use std::fs::{remove_dir_all, rename};
 use std::rc::Rc;
-use super::{LSMTree, TableNode, Level};
+use std::str::Split;
 
 impl LSMTree<SF> {
     pub fn new(
@@ -16,7 +17,6 @@ impl LSMTree<SF> {
         size_threshold: usize,
         number_of_levels: usize,
     ) -> Self {
-
         let marker: std::marker::PhantomData<SF> = Default::default();
         let mut levels = vec![];
         for _ in 0..number_of_levels {
@@ -246,7 +246,6 @@ impl LSMTree<SF> {
             }
         }
 
-
         let tablename = &format!("sstable-{}-{}", level_num + 1, last + 1);
 
         let mut iterators: Vec<_> = self.levels[level_num]
@@ -281,8 +280,6 @@ impl LSMTree<SF> {
             self.summary_nth,
         )
         .context("creating builder")?;
-
-
 
         let mut last_key: Option<Vec<u8>> = None;
         let mut relevant_entries: Vec<Rc<Entry>> = Vec::new();
@@ -349,10 +346,49 @@ impl LSMTree<SF> {
 
         if self.levels[level_num + 1].nodes.len() >= self.size_threshold {
             let msg = format!("MERGING RECURSE {level_num} -> {}", level_num + 1);
-            println!("{}", msg);
             self.merge(level_num + 1, dirname).context(msg)?;
         }
 
+        Ok(())
+    }
+
+    pub fn load(&mut self) -> Result<()> {
+        let paths =
+            std::fs::read_dir(self.data_dir.clone()).context("reading directory contents")?;
+
+        println!("dir mfw {}", self.data_dir.clone());
+
+        for file in paths {
+            let filepath = file.context("reading filename").unwrap().path();
+
+            let dir_name = filepath
+                .file_name()
+                .and_then(|name| name.to_str())
+                .expect("Failed to convert OsStr to String");
+
+            println!("paths mfw {dir_name}");
+
+            let mut tokens: Vec<&str> = dir_name.split("-").collect();
+            tokens.reverse();
+            println!("{}", tokens[1]);
+            let level = tokens[1].parse::<usize>().context("parsing level num")?;
+
+            if self.levels.len() > level {
+                self.levels[level].nodes.push(TableNode {
+                    path: String::from(dir_name.clone()),
+                });
+
+                self.levels[level]
+                    .nodes
+                    .sort_by_key(|node| node.path.clone());
+            } else {
+                self.levels.push(Level {
+                    nodes: vec![TableNode {
+                        path: String::from(dir_name.clone()),
+                    }],
+                });
+            }
+        }
         Ok(())
     }
 }
