@@ -358,4 +358,44 @@ impl LSMTree<MF> {
 
         Ok(())
     }
+
+    pub fn load(&mut self) -> Result<()> {
+        let paths =
+            std::fs::read_dir(self.data_dir.clone()).context("reading directory contents")?;
+
+        println!("dir mfw {}", self.data_dir.clone());
+
+        for file in paths {
+            let filepath = file.context("reading filename").unwrap().path();
+
+            let dir_name = filepath
+                .file_name()
+                .and_then(|name| name.to_str())
+                .expect("Failed to convert OsStr to String");
+
+            println!("paths mfw {dir_name}");
+
+            let mut tokens: Vec<&str> = dir_name.split("-").collect();
+            tokens.reverse();
+            println!("{}", tokens[1]);
+            let level = tokens[1].parse::<usize>().context("parsing level num")?;
+
+            if self.levels.len() > level {
+                self.levels[level].nodes.push(TableNode {
+                    path: String::from(dir_name.clone()),
+                });
+
+                self.levels[level]
+                    .nodes
+                    .sort_by_key(|node| node.path.clone());
+            } else {
+                self.levels.push(Level {
+                    nodes: vec![TableNode {
+                        path: String::from(dir_name.clone()),
+                    }],
+                });
+            }
+        }
+        Ok(())
+    }
 }
