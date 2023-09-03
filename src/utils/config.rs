@@ -88,7 +88,7 @@ impl TokenBucketConfig {
             reset_interval: Duration::from_secs(2),
         }
     }
-    pub fn defaults(&self) -> (usize, Duration) {
+    pub fn get_values(&self) -> (usize, Duration) {
         (self.capacity, self.reset_interval)
     }
 }
@@ -106,7 +106,7 @@ impl CountMinSketchConfig {
             certainty: 0.01,
         }
     }
-    pub fn defaults(&self) -> (f64, f64) {
+    pub fn get_values(&self) -> (f64, f64) {
         (self.desired_accuracy, self.certainty)
     }
 }
@@ -125,7 +125,7 @@ impl BloomFilterConfig {
         }
     }
 
-    pub fn defaults(&self) -> (u64, f64) {
+    pub fn get_values(&self) -> (u64, f64) {
         (self.item_count, self.fp_prob)
     }
 }
@@ -150,7 +150,7 @@ impl LSMTreeConfig {
         }
     }
 
-    pub fn defaults(&self) -> (f64, u64, String, usize, usize) {
+    pub fn get_values(&self) -> (f64, u64, String, usize, usize) {
         (
             self.fp_prob,
             self.summary_nth,
@@ -169,7 +169,7 @@ impl SSTableConfig {
             summary_nth: 50,
         }
     }
-    pub fn defaults(&self) -> (FileOrganization, f64, u64) {
+    pub fn get_values(&self) -> (FileOrganization, f64, u64) {
         (
             self.file_organization.clone(),
             self.filter_fp_prob,
@@ -188,8 +188,38 @@ impl HLLConfig {
         HLLConfig { number_of_bits: 10 }
     }
 
-    pub fn defaults(&self) -> u8 {
+    pub fn get_values(&self) -> u8 {
         self.number_of_bits
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MemtableConfig {
+    capacity: u64,
+    sstable_type: FileOrganization,
+    fp_prob: f64,
+    summary_nth: u64,
+    data_folder: String,
+}
+
+impl MemtableConfig {
+    fn default() -> Self {
+        MemtableConfig {
+            capacity: 50,
+            sstable_type: FileOrganization::SingleFile(()),
+            fp_prob: 0.01,
+            summary_nth: 50,
+            data_folder: String::from("data/table_data"),
+        }
+    }
+    fn get_values(&self) -> (u64, FileOrganization, f64, u64, String) {
+        (
+            self.capacity,
+            self.sstable_type,
+            self.fp_prob,
+            self.summary_nth,
+            self.data_folder
+        )
     }
 }
 
@@ -212,7 +242,7 @@ impl SimHashConfig {
         }
     }
 
-    pub fn defaults(&self) -> (u64, HashSet<String>) {
+    pub fn get_values(&self) -> (u64, HashSet<String>) {
         (self.simhash, self.stopwords.clone())
     }
 }
@@ -227,7 +257,7 @@ impl SkipListConfig {
         SkipListConfig { max_level: 10 }
     }
 
-    pub fn defaults(&self) -> usize {
+    pub fn get_values(&self) -> usize {
         self.max_level
     }
 }

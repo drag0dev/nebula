@@ -4,7 +4,8 @@ use crate::building_blocks::{
 };
 use crate::repl::{Commands, BloomFilterCommands, HLLCommands, CMSCommands, SimHashCommands};
 use crate::repl::REPL;
-use anyhow::{Context, Result, anyhow};
+use crate::utils::config::Config;
+use anyhow::{Context, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -21,10 +22,24 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Result<Self> {
+
+        let config = Config::default();
+        // OR
+        // let config = Config::load_from_file().context("reading json")?;
+        
         let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
 
+        //let mut memtable = Memtable::new(
+        //    Box::new(b_tree),
+        //    2,
+        //    crate::building_blocks::FileOrganization::SingleFile(()),
+        //    0.1,
+        //    50,
+        //    String::from("data/table_data"),
+        //);
+        
         let mut memtable = Memtable::new(
-            Box::new(b_tree),
+            config.memtable.get_values()
             2,
             crate::building_blocks::FileOrganization::SingleFile(()),
             0.1,
