@@ -4,7 +4,7 @@ use crate::building_blocks::{
 };
 use crate::repl::{Commands, BloomFilterCommands, HLLCommands, CMSCommands, SimHashCommands};
 use crate::repl::REPL;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -67,7 +67,6 @@ impl Engine {
 
                 if let Some(result) = memtable.delete(tombstone) {
                     if let Ok(_) = result {
-                        // println!("flushing");
                         lsm.insert("memtable")
                             .context("inserting memetable into lsm")?;
                     }
@@ -97,20 +96,17 @@ impl Engine {
                         self.get(vec_key).context("getting entry from lsm")?;
                     }
                     Commands::Put { key, value } => {
-                        println!("PUT: {} {}", key, value);
                         self.put(key, Some(value.as_bytes().to_vec()))
                             .context("putting {key} {value}")?;
                     }
                     Commands::Delete { key } => {
                         self.delete(key.clone()).context("deleting {key}")?;
-                        println!("DELETE: {}", key);
                     }
                     Commands::Bf(cmd) => self.bloomfilter(cmd)?,
                     Commands::Hll(cmd) => self.hll(cmd)?,
                     Commands::Cms(cmd) => self.cms(cmd)?,
                     Commands::Sh(cmd) => self.simhash(cmd)?,
                     Commands::Quit => {
-                        println!("quitting...");
                         self.quit().context("quitting")?;
                         break;
                     }
@@ -124,8 +120,10 @@ impl Engine {
     }
 
     fn quit(&mut self) -> Result<()> {
-        self.memtable.flush().context("flushing memtable")?;
-        self.handle_memtable_flush().context("handling memtable flush")?;
+        if self.memtable.len > 0 {
+            self.memtable.flush().context("flushing memtable")?;
+            self.handle_memtable_flush().context("handling memtable flush")?;
+        }
 
         self.wal.purge().context("purging wal")
     }
@@ -134,12 +132,20 @@ impl Engine {
         let strkey = String::from_utf8(key.clone()).context("converting key to string")?;
         let result = self.memtable.read(strkey.clone());
         if let Some(mem_entry) = result {
-            println!("ENTRY: {:?}", mem_entry);
+            if !is_key_reserved(&mem_entry.borrow().key.as_bytes()) {
+                print_memtable_entry(&*mem_entry.as_ref().borrow())?;
+            }
             return Ok(Some(Entry::from(&*mem_entry.as_ref().borrow())));
         }
 
         if let Some(entry) = self.cache.find(&key[..]) {
-            println!("ENTRY: {:?}", entry);
+            if entry.is_some() {
+                if !is_key_reserved(&key) {
+                    println!("Key: {strkey}");
+                    let value = String::from_utf8(entry.as_ref().unwrap().to_vec()).context("converting key to string")?;
+                    println!("Value: {value}");
+                }
+            }
             let entry = Entry {
                 timestamp: 0,
                 key,
@@ -151,10 +157,10 @@ impl Engine {
         let result: Option<Entry> = self.lsm.get(key);
         if let Some(entry) = result {
             self.cache.add(&entry.key, entry.value.clone().as_deref());
-            println!("ENTRY: {:?}", entry);
+            if !is_key_reserved(&entry.key) { print_entry(&entry)?; }
             return Ok(Some(entry));
         } else {
-            println!("KEY NOT FOUND");
+            println!("Key not found");
         }
 
         Ok(None)
@@ -168,7 +174,6 @@ impl Engine {
         // I don't know why it only works this way
         if let Some(result) = self.memtable.create(mementry) {
             if let Ok(_) = result {
-                println!("OK PUT");
                 return self.handle_memtable_flush();
             } else {
                 return result;
@@ -179,12 +184,11 @@ impl Engine {
     }
 
     fn delete(&mut self, key: String) -> Result<()> {
-        let entry = MemtableEntry::new_string(get_timestamp()?, key, None);
+        let entry = MemtableEntry::new(get_timestamp()?, key, None);
         let walentry = Entry::from(&entry);
         self.wal.add(&walentry).context("adding to WAL")?;
         if let Some(result) = self.memtable.delete(entry) {
             if let Ok(_) = result {
-                println!("OK DELETE");
                 return self.handle_memtable_flush();
             } else {
                 return result;
@@ -196,6 +200,7 @@ impl Engine {
     fn bloomfilter(&mut self, cmd: BloomFilterCommands) -> Result<()> {
         match cmd {
             BloomFilterCommands::Add { bloom_filter_key, value } => {
+                if !key_starts_with(&bloom_filter_key, "bf_") { return Ok(()) }
                 let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
                 if let Some(bf_ser) = bf_ser {
                     if let Some(bf_value) = bf_ser.value {
@@ -209,11 +214,13 @@ impl Engine {
                 }
             },
             BloomFilterCommands::New { bloom_filter_key } => {
+                if !key_starts_with(&bloom_filter_key, "bf_") { return Ok(()) }
                 let bf = BloomFilter::new(5, 0.01);
                 let bf_ser = bf.serialize()?;
                 self.put(bloom_filter_key, Some(bf_ser))?;
             },
             BloomFilterCommands::Check { bloom_filter_key, value } => {
+                if !key_starts_with(&bloom_filter_key, "bf_") { return Ok(()) }
                 let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
                 if let Some(bf_ser) = bf_ser {
                     if let Some(bf_value) = bf_ser.value {
@@ -237,11 +244,13 @@ impl Engine {
     fn hll(&mut self, cmd: HLLCommands) -> Result<()> {
         match cmd {
             HLLCommands::New { hll_key } => {
+                if !key_starts_with(&hll_key, "hll_") { return Ok(()) }
                 let hll = HyperLogLog::new(8);
                 let hll_ser = hll.serialize()?;
                 self.put(hll_key, Some(hll_ser))?;
             }
             HLLCommands::Add { hll_key, value } => {
+                if !key_starts_with(&hll_key, "hll_") { return Ok(()) }
                 let hll = self.get(hll_key.clone().into_bytes())?;
                 if let Some(hll) = hll {
                     if let Some(hll_ser) = hll.value {
@@ -255,6 +264,7 @@ impl Engine {
                 }
             },
             HLLCommands::Count { hll_key } => {
+                if !key_starts_with(&hll_key, "hll_") { return Ok(()) }
                 let hll = self.get(hll_key.clone().into_bytes())?;
                 if let Some(hll) = hll {
                     if let Some(hll_ser) = hll.value {
@@ -272,11 +282,13 @@ impl Engine {
     fn cms(&mut self, cmd: CMSCommands) -> Result<()> {
         match cmd {
             CMSCommands::New { cms_key } => {
+                if !key_starts_with(&cms_key, "cms_") { return Ok(()) }
                 let cms = CountMinSketch::new(0.1, 0.1);
                 let cms_ser = cms.serialize()?;
                 self.put(cms_key, Some(cms_ser))?;
             },
             CMSCommands::Count { cms_key } => {
+                if !key_starts_with(&cms_key, "cms_") { return Ok(()) }
                 let cms_ser = self.get(cms_key.clone().into_bytes())?;
                 if let Some(cms_ser) = cms_ser {
                     if let Some(cms_ser) = cms_ser.value {
@@ -288,6 +300,7 @@ impl Engine {
                 }
             },
             CMSCommands::Add { cms_key, value } => {
+                if !key_starts_with(&cms_key, "cms_") { return Ok(()) }
                 let cms_ser = self.get(cms_key.clone().into_bytes())?;
                 if let Some(cms_ser) = cms_ser {
                     if let Some(cms_ser) = cms_ser.value {
@@ -307,7 +320,9 @@ impl Engine {
 
     fn simhash(&mut self, cmd: SimHashCommands) -> Result<()> {
         match cmd {
-            SimHashCommands::Hash { value } => { },
+            SimHashCommands::Hash { value } => {
+                // if !key_starts_with(&cms_key, "hs") { return Ok(()) }
+            },
             SimHashCommands::Similarity { left, right } => { }
         }
         Ok(())
@@ -325,4 +340,50 @@ fn get_timestamp() -> Result<u128> {
         .duration_since(UNIX_EPOCH)
         .context("getting epoch time")?
         .as_nanos())
+}
+
+fn print_entry(entry: &Entry) -> Result<()> {
+    if entry.value.is_none() {
+        println!("Key not found");
+    } else {
+        let key = String::from_utf8(entry.key.clone()).context("converting key to string")?;
+        println!("Key: {}", key);
+        print_value(&entry.value.as_ref().unwrap())?;
+    }
+    Ok(())
+}
+
+fn print_memtable_entry(entry: &MemtableEntry) -> Result<()> {
+    if entry.value.is_none() {
+        println!("Key not found");
+    } else {
+        println!("Key: {}", entry.key);
+        print_value(&entry.value.as_ref().unwrap())?;
+    }
+    Ok(())
+}
+
+fn print_value(input: &[u8]) -> Result<()> {
+    let value = String::from_utf8(input.to_vec()).context("converting value to string")?;
+    println!("Value: {value}");
+    Ok(())
+}
+
+fn is_key_reserved(input: &[u8]) -> bool {
+    let mut reserved = false;
+    for prefix in ["bf_", "cms_", "hll_", "sh_"] {
+        if input.starts_with(prefix.as_bytes()) {
+            reserved = true;
+        }
+    }
+    reserved
+}
+
+fn key_starts_with(key: &str, prefix: &str) -> bool {
+    let key_vec = key.as_bytes();
+    if !key_vec.starts_with(prefix.as_bytes()) {
+        println!("key {} doesnt start with the reserved prefix {}", key, prefix);
+        return false;
+    }
+    true
 }
