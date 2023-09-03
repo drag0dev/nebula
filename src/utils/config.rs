@@ -25,6 +25,7 @@ pub struct Config {
     pub simhash: SimHashConfig,
     pub memtable: MemtableConfig,
     pub wal: WALConfig,
+    pub cache: CacheConfig,
 }
 
 impl Config {
@@ -40,6 +41,7 @@ impl Config {
             simhash: SimHashConfig::default(),
             memtable: MemtableConfig::default(),
             wal: WALConfig::default(),
+            cache: CacheConfig::default(),
         }
     }
 
@@ -201,7 +203,7 @@ impl HLLConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MemtableStorage {
     BTree,
     SkipList
@@ -230,7 +232,7 @@ impl MemtableConfig {
     }
     pub fn get_values(&self) -> (MemtableStorage, u64, FileOrganization, f64, u64, String) {
         (
-            self.storage,
+            self.storage.clone(),
             self.capacity,
             self.sstable_type.clone(),
             self.fp_prob,
@@ -287,10 +289,24 @@ pub struct WALConfig {
 
 impl WALConfig {
     pub fn default() -> Self {
-        WALConfig { segment_size: 2000, path: String::from("data/WAL") } 
+        WALConfig { segment_size: 2000, path: String::from("data/WAL") }
     }
     pub fn get_values(&self) -> (String, u64) {
         (self.path.clone(), self.segment_size)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CacheConfig {
+    capacity: u64,
+}
+
+impl CacheConfig {
+    pub fn default() -> Self {
+        CacheConfig { capacity: 1000 }
+    }
+    pub fn get_values(&self) -> u64 {
+        self.capacity
     }
 }
 

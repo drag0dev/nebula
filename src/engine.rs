@@ -62,29 +62,35 @@ impl Engine {
             }
         }
 
-        let engine = Engine {
-            memtable,
-            cache,
-            wal,
-            lsm: Box::new(lsm),
-        };
-
+        let cache = Cache::new(config.cache.get_values());
+        let wal_vars = config.wal.get_values();
+        let wal = WriteAheadLog::new(&wal_vars.0, wal_vars.1).context("creating WAL")?;
         let lsm_vars = config.lsm.get_values();
-        match lsm_vars.0 {
+        let mut engine = match lsm_vars.0 {
             SingleFile(()) => {
-                LSMTree::<SF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
+                let lsm = LSMTree::<SF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
+                Engine {
+                    memtable,
+                    cache,
+                    wal,
+                    lsm: Box::new(lsm),
+                }
             },
             MultiFile(()) => {
-                LSMTree::<MF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
+                let lsm = LSMTree::<MF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
+                Engine {
+                    memtable,
+                    cache,
+                    wal,
+                    lsm: Box::new(lsm),
+                }
             }
         };
 
         // load data if found
-        lsm.load().context("loading data into lsm")?;
+        engine.lsm.load().context("loading data into lsm")?;
 
-        let wal_vars = config.wal.get_values();
 
-        let mut wal = WriteAheadLog::new(&wal_vars.0, wal_vars.1).context("creating WAL")?;
 
         let mut wal_reader =
             WriteAheadLogReader::iter(&wal_vars.0).context("getting wal_reader iter")?;
@@ -101,7 +107,7 @@ impl Engine {
                 if entry.value.is_some() {
                     let mementry = MemtableEntry::new(entry.timestamp, key.clone(), entry.value);
 
-                    memtable.create(mementry);
+                    engine.memtable.create(mementry);
                     continue;
                 }
 
@@ -112,15 +118,15 @@ impl Engine {
                     value: None,
                 };
 
-                if let Some(result) = memtable.delete(tombstone) {
+                if let Some(result) = engine.memtable.delete(tombstone) {
                     if let Ok(_) = result {
-                        lsm.insert("memtable")
+                        engine.lsm.insert("memtable")
                             .context("inserting memetable into lsm")?;
                     }
                 }
             }
         }
-        wal.purge().context("purging wal")?;
+        engine.wal.purge().context("purging wal")?;
 
         let cache = Cache::new(400);
 
