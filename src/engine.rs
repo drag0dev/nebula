@@ -1,5 +1,5 @@
 use crate::building_blocks::{
-    BTree, Cache, Entry, LSMTree, Memtable, MemtableEntry, WriteAheadLog, SF,
+    BTree, Cache, Entry, LSMTree, Memtable, MemtableEntry, WriteAheadLog, SF, CountMinSketch,
 };
 use crate::repl::Commands;
 use crate::repl::REPL;
@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::utils::config::{Config};
 
 pub struct Engine {
     memtable: Memtable<BTree<String, Rc<RefCell<MemtableEntry>>>>,
@@ -18,6 +19,12 @@ pub struct Engine {
 impl Engine {
     pub fn new() -> Result<Engine> {
         let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
+
+        let config = Config::default();
+        let (v1, v2) = config.cms.defaults();
+        let cms = CountMinSketch::new(v1, v2);
+
+        let p = config.hll.defaults();
 
         let memtable = Memtable::new(
             b_tree,

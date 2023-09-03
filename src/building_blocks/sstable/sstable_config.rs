@@ -1,16 +1,20 @@
+use serde::{Serialize,Deserialize};
 // TODO: derive serialization for RON?
+
+#[derive(Serialize, Deserialize)]
 pub struct SSTableConfig {
-    file_organization: FileOrganization,
+    pub file_organization: FileOrganization,
 
     // TODO: assert that this is > 2
     /// every n key make an entry in the summary
-    summary_nth: u64,
+    pub summary_nth: u64,
 
     /// filter false positive probability
-    filter_fp_prob: f64,
+    pub filter_fp_prob: f64,
 }
 
 #[derive(PartialEq)]
+#[derive(Serialize, Deserialize)]
 pub enum FileOrganization {
     SingleFile(()),
     MultiFile(()),
