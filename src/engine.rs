@@ -13,9 +13,6 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use bincode::Options;
 
-// TODO: add config as a field to the engine
-// TODO: cms input value when counting?
-
 pub struct Engine {
     memtable: Memtable,
     cache: Cache,
@@ -337,7 +334,8 @@ impl Engine {
                 if !key_starts_with(&bloom_filter_key, "bf_") {
                     return Ok(());
                 }
-                let bf = BloomFilter::new(5, 0.01);
+                let bf_vars = self.config.bf.get_values();
+                let bf = BloomFilter::new(bf_vars.0, bf_vars.1);
                 let bf_ser = bf.serialize()?;
                 self.put(bloom_filter_key, Some(bf_ser))?;
             }
@@ -375,7 +373,8 @@ impl Engine {
                 if !key_starts_with(&hll_key, "hll_") {
                     return Ok(());
                 }
-                let hll = HyperLogLog::new(8);
+                let hll_vars = self.config.hll.get_values();
+                let hll = HyperLogLog::new(hll_vars);
                 let hll_ser = hll.serialize()?;
                 self.put(hll_key, Some(hll_ser))?;
             }
@@ -419,7 +418,8 @@ impl Engine {
                 if !key_starts_with(&cms_key, "cms_") {
                     return Ok(());
                 }
-                let cms = CountMinSketch::new(0.1, 0.1);
+                let cms_vars = self.config.cms.get_values();
+                let cms = CountMinSketch::new(cms_vars.0, cms_vars.1);
                 let cms_ser = cms.serialize()?;
                 self.put(cms_key, Some(cms_ser))?;
             }
@@ -463,7 +463,8 @@ impl Engine {
             SimHashCommands::Hash { key, value } => {
                 if !key_starts_with(&key, "sh_") { return Ok(()) }
                 let stopwortds = HashSet::from(["this".to_owned()]);
-                let mut sh = SimHash::new(0, stopwortds);
+                let sh_vars = self.config.simhash.get_values();
+                let mut sh = SimHash::new(sh_vars.0, sh_vars.1);
                 sh.calculate(&value);
 
                 let fingerprint = sh.fingerprint();

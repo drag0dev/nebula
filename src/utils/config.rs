@@ -289,7 +289,7 @@ pub struct WALConfig {
 
 impl WALConfig {
     pub fn default() -> Self {
-        WALConfig { segment_size: 2000, path: String::from("data/WAL") }
+        WALConfig { segment_size: 20000, path: String::from("data/WAL") }
     }
     pub fn get_values(&self) -> (String, u64) {
         (self.path.clone(), self.segment_size)
