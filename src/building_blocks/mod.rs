@@ -53,8 +53,7 @@ pub use sstable::{
     SSTableConfig, FileOrganization,
     SSTableBuilderMultiFile, SSTableReaderMultiFile, SSTableIteratorMultiFile,
     SSTableBuilderSingleFile, SSTableReaderSingleFile, SSTableIteratorSingleFile,
-    SF, MF
-
+    SF, MF, LSMTreeUnderlying
 };
 
 

@@ -30,7 +30,7 @@ fn main() {
             }
         }
         CliCommands::Start => {
-            let engine = Engine::new().context("oh goober!");
+            let engine = Engine::new().context("instantiating engine");
             if let Err(e) = engine {
                 print_err(e);
             } else {

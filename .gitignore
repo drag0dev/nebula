@@ -4,3 +4,4 @@ cms-seeds.txt
 test-data/
 data/table_data/*
 data/WAL/*
+data/
