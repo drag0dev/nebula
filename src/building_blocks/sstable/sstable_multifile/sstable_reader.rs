@@ -4,7 +4,7 @@ use std::{
 };
 use anyhow::{Result, Context};
 use super::SSTableIteratorMultiFile;
-use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, BloomFilter};
+use crate::building_blocks::{IndexIterator, SummaryIterator, SummaryEntry, BloomFilter, Entry};
 
 pub struct SSTableReaderMultiFile {
     pub filter: BloomFilter,
@@ -65,6 +65,37 @@ impl SSTableReaderMultiFile {
         fd.rewind().context("rewinding summary fd for summary iter")?;
         SummaryIterator::iter(fd)
     }
+
+    pub fn range_scan(&self, start: &[u8], end: &[u8]) -> Result<Vec<Entry>> {
+        let (summary_iter, range) = self.summary_iter().context("reading summary")?;
+        if !(&range.first_key[..] <= end && &range.last_key[..] >= start) { return Ok(vec![]); }
+
+        let mut index_offset = None;
+        for entry in summary_iter {
+            let entry = entry.context("reading summary entry")?;
+            if &entry.first_key[..] <= end && &range.last_key[..] >= start {
+                index_offset = Some(entry.offset);
+            }
+        }
+
+        if index_offset.is_some() {
+            let mut res = Vec::new();
+            let mut index_iter = self.index_iter().context("getting index iterator")?;
+            index_iter.move_iter(index_offset.unwrap()).context("")?;
+            let index_entry = index_iter.next().unwrap().context("reading index entry")?;
+            let mut iter = self.iter().context("getting sstable iter")?;
+            iter.move_iter(index_entry.offset).context("moving sstable iter")?;
+
+            for entry in iter {
+                let entry = entry.context("reading sstable entry")?;
+                if &entry.key[..] >= start && &entry.key[..] <= end { res.push(entry); }
+                else if &entry.key[..] >= end { break; }
+            }
+            Ok(res)
+        } else {
+            Ok(vec![])
+        }
+    }
 }
 
 pub fn open_file(dir: &str, name: &str) -> Result<File> {
@@ -73,4 +104,20 @@ pub fn open_file(dir: &str, name: &str) -> Result<File> {
         .read(true)
         .open(file_path)?;
     Ok(file)
+}
+
+fn prefix_intersects(prefix: &[u8], start: &[u8], end: &[u8]) -> bool {
+    let prefix_len = prefix.len();
+    let start_prefix = &start[..prefix_len];
+    let end_prefix = &end[..prefix_len];
+    prefix >= start_prefix && prefix <= end_prefix
+}
+
+fn vector_prefix(prefix: &[u8], key: &[u8]) -> bool {
+    prefix == &key[..prefix.len()]
+
+}
+
+fn end(prefix: &[u8], key: &[u8]) -> bool {
+    prefix > &key[..prefix.len()]
 }
