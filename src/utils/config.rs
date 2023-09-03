@@ -3,13 +3,15 @@ use crate::building_blocks::{
     SkipListNode, TokenBucket, MF, SF,
 };
 use core::cell::RefCell;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub token_bucket: TokenBucketConfig,
     pub cms: CountMinSketchConfig,
@@ -17,6 +19,8 @@ pub struct Config {
     pub lsm: LSMTreeConfig,
     pub hll: HLLConfig,
     pub ssconfig: SSTableConfig,
+    pub skiplist: SkipListConfig,
+    pub simhash: SimHashConfig,
 }
 
 impl Config {
@@ -28,11 +32,49 @@ impl Config {
             lsm: LSMTreeConfig::default(),
             hll: HLLConfig::default(),
             ssconfig: SSTableConfig::default(),
+            skiplist: SkipListConfig::default(),
+            simhash: SimHashConfig::default(),
         }
+    }
+
+    // Method to load the JSON configuration from a file into a Config struct
+    pub fn load_from_file() -> serde_json::Result<Self> {
+        // Open the file
+        let mut file = File::open("data/config.json").expect("Unable to open file");
+
+        // Create a string to hold the file contents
+        let mut contents = String::new();
+
+        // Read the file contents into the string
+        file.read_to_string(&mut contents)
+            .expect("Unable to read data");
+
+        // Deserialize the JSON string into a Config struct
+        let config: Config = serde_json::from_str(&contents)?;
+
+        Ok(config)
+    }
+
+    pub fn write_defaults_to_file() -> serde_json::Result<()> {
+        // Create a default Config
+        let config = Config::default();
+
+        // Serialize it to a JSON string
+        let json_str = serde_json::to_string(&config)?;
+
+        // Open a new file or overwrite an existing one named "config.json"
+        let mut file = File::create("data/config.json").expect("Unable to create file");
+
+        // Write the JSON string to the file
+        file.write_all(json_str.as_bytes())
+            .expect("Unable to write data");
+
+        println!("Serialized Config to JSON file: data/config.json");
+        Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TokenBucketConfig {
     capacity: usize,
     reset_interval: Duration, // not directly serializable :D
@@ -50,7 +92,7 @@ impl TokenBucketConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CountMinSketchConfig {
     desired_accuracy: f64,
     certainty: f64,
@@ -68,7 +110,7 @@ impl CountMinSketchConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BloomFilterConfig {
     item_count: u64,
     fp_prob: f64,
@@ -87,7 +129,7 @@ impl BloomFilterConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LSMTreeConfig {
     fp_prob: f64,
     summary_nth: u64,
@@ -111,7 +153,7 @@ impl LSMTreeConfig {
         (
             self.fp_prob,
             self.summary_nth,
-            self.data_dir,
+            self.data_dir.clone(),
             self.size_threshold,
             self.number_of_levels,
         )
@@ -128,14 +170,14 @@ impl SSTableConfig {
     }
     pub fn defaults(&self) -> (FileOrganization, f64, u64) {
         (
-            self.file_organization,
+            self.file_organization.clone(),
             self.filter_fp_prob,
             self.summary_nth,
         )
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct HLLConfig {
     number_of_bits: u8,
 }
@@ -150,7 +192,7 @@ impl HLLConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SimHashConfig {
     simhash: u64,
     stopwords: HashSet<String>,
@@ -170,11 +212,11 @@ impl SimHashConfig {
     }
 
     pub fn defaults(&self) -> (u64, HashSet<String>) {
-        (self.simhash, self.stopwords)
+        (self.simhash, self.stopwords.clone())
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SkipListConfig {
     max_level: usize,
 }

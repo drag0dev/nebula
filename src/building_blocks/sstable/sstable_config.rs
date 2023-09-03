@@ -1,7 +1,7 @@
 use serde::{Serialize,Deserialize};
 // TODO: derive serialization for RON?
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SSTableConfig {
     pub file_organization: FileOrganization,
 
@@ -13,8 +13,9 @@ pub struct SSTableConfig {
     pub filter_fp_prob: f64,
 }
 
+#[derive(Clone)]
 #[derive(PartialEq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum FileOrganization {
     SingleFile(()),
     MultiFile(()),
