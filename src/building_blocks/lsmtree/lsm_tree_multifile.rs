@@ -581,6 +581,26 @@ impl LSMTreeInterface for LSMTree<MF> {
                 });
             }
         }
+
+        // read all files in data dir
+        let files = read_dir(self.data_dir.clone()).context("reading data dir")?;
+
+        let mut filenames = vec![];
+        for file in files {
+            let filepath = file.context("unwrapping file").unwrap();
+            let filepath = filepath.path();
+            let filepath = filepath.display();
+            filenames.push(filepath.to_string());
+        }
+
+        filenames.sort();
+        if let Some(filename) = filenames.pop() {
+            let tokens = filename.split("-").last();
+                if let Some(index) = tokens {
+                    self.last_table = index.parse::<usize>().context("parsing last table index")?;
+                }
+        }
+
         Ok(())
     }
 }
