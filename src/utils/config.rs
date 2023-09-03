@@ -10,6 +10,7 @@ use std::io::Read;
 use std::io::Write;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use anyhow::{Result, Context};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -38,36 +39,36 @@ impl Config {
     }
 
     // Method to load the JSON configuration from a file into a Config struct
-    pub fn load_from_file() -> serde_json::Result<Self> {
+    pub fn load_from_file() -> Result<Self> {
         // Open the file
-        let mut file = File::open("data/config.json").expect("Unable to open file");
+        let mut file = File::open("data/config.json").context("Unable to open file")?;
 
         // Create a string to hold the file contents
         let mut contents = String::new();
 
         // Read the file contents into the string
         file.read_to_string(&mut contents)
-            .expect("Unable to read data");
+            .context("Unable to read data")?;
 
         // Deserialize the JSON string into a Config struct
-        let config: Config = serde_json::from_str(&contents)?;
+        let config: Config = serde_json::from_str(&contents).context("deserializing config")?;
 
         Ok(config)
     }
 
-    pub fn write_defaults_to_file() -> serde_json::Result<()> {
+    pub fn write_defaults_to_file() -> Result<()> {
         // Create a default Config
         let config = Config::default();
 
         // Serialize it to a JSON string
-        let json_str = serde_json::to_string(&config)?;
+        let json_str = serde_json::to_string_pretty(&config)?;
 
         // Open a new file or overwrite an existing one named "config.json"
-        let mut file = File::create("data/config.json").expect("Unable to create file");
+        let mut file = File::create("data/config.json").context("Unable to create file")?;
 
         // Write the JSON string to the file
         file.write_all(json_str.as_bytes())
-            .expect("Unable to write data");
+            .context("Unable to write data")?;
 
         println!("Serialized Config to JSON file: data/config.json");
         Ok(())
