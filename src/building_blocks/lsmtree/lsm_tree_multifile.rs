@@ -229,11 +229,9 @@ impl LSMTreeInterface for LSMTree<MF> {
             .into_iter()
             .map(|file| {
                 let filepath = file.context("unwrapping file").unwrap();
-                let filepath = filepath.path();
-                let filepath = filepath.display();
-                let filepath = &(format!("{}/{}", self.data_dir, filepath));
+                let filepath = filepath.path().to_str().unwrap().to_owned();
 
-                SSTableReader::load(filepath)
+                SSTableReader::load(&filepath)
                     .with_context(|| format!("loading {}", filepath))
                     .unwrap()
                     .prefix_scan(prefix)
@@ -277,6 +275,7 @@ impl LSMTreeInterface for LSMTree<MF> {
 
                             // unpack the entry
                             out_entries.push((**entry).clone());
+                            break;
                         }
 
                         relevant_entries.clear();
@@ -296,6 +295,7 @@ impl LSMTreeInterface for LSMTree<MF> {
                         }
 
                         out_entries.push((**entry).clone());
+                        break;
                     }
 
                     relevant_entries.clear();
@@ -321,11 +321,9 @@ impl LSMTreeInterface for LSMTree<MF> {
             .into_iter()
             .map(|file| {
                 let filepath = file.context("unwrapping file").unwrap();
-                let filepath = filepath.path();
-                let filepath = filepath.display();
-                let filepath = &(format!("{}/{}", self.data_dir, filepath));
+                let filepath = filepath.path().to_str().unwrap().to_owned();
 
-                SSTableReader::load(filepath)
+                SSTableReader::load(&filepath)
                     .with_context(|| format!("loading {}", filepath))
                     .unwrap()
                     .range_scan(start_key.as_bytes(), end_key.as_bytes())
@@ -388,6 +386,7 @@ impl LSMTreeInterface for LSMTree<MF> {
                         }
 
                         out_entries.push((**entry).clone());
+                        break;
                     }
 
                     relevant_entries.clear();

@@ -161,15 +161,66 @@ impl Engine {
                     }
 
                     Commands::List { key_prefix, pagination } => {
-                        let result = self.lsm.prefix_scan(&key_prefix).context("running prefix scan")?;
-                        println!("entries {:?}", result);
+                        let mut mem_res = self.memtable.prefix_scan(key_prefix.clone())
+                            .iter()
+                            .map(|e| Entry::from(&*e.as_ref().borrow()))
+                            .collect::<Vec<_>>();
+                        let lsm_res = self.lsm.prefix_scan(&key_prefix).context("running prefix scan")?;
+                        mem_res.extend_from_slice(&lsm_res);
+                        if pagination.is_none() {
+                            for entry in mem_res {
+                                print_entry(&entry)?;
+                                println!();
+                            }
+                        } else {
+                            let pagination = pagination.unwrap();
+                            let mut page = pagination[0];
+                            if page == 0 {page = 1};
+                            let page_size = pagination[1];
+                            let iter = mem_res
+                                .iter()
+                                .step_by(page_size as usize)
+                                .skip((page-1) as usize);
+                            let mut counter = 0;
+                            for entry in iter {
+                                if counter == page_size { break; }
+                                print_entry(&entry)?;
+                                println!();
+                                counter += 1;
+                            }
+                        }
                     }
 
                     Commands::RangeScan { start_key, end_key, pagination } => {
-                        let result = self.lsm.range_scan(&start_key, &end_key).context("running range scan")?;
-                        println!("entries {:?}", result);
+                        let mut mem_res = self.memtable.range_scan(start_key.clone(), end_key.clone())
+                            .iter()
+                            .map(|e| Entry::from(&*e.as_ref().borrow()))
+                            .collect::<Vec<_>>();
+                        let lsm_res = self.lsm.range_scan(&start_key, &end_key).context("running prefix scan")?;
+                        mem_res.extend_from_slice(&lsm_res);
+                        if pagination.is_none() {
+                            for entry in mem_res {
+                                print_entry(&entry)?;
+                                println!();
+                            }
+                        } else {
+                            let pagination = pagination.unwrap();
+                            let mut page = pagination[0];
+                            if page == 0 {page = 1};
+                            let page_size = pagination[1];
+                            let iter = mem_res
+                                .iter()
+                                .step_by(page_size as usize)
+                                .skip((page-1) as usize);
+                            let mut counter = 0;
+                            for entry in iter {
+                                if counter == page_size { break; }
+                                print_entry(&entry)?;
+                                println!();
+                                counter += 1;
+                            }
+                        }
                     }
-
                 }
             } else {
                 query.context("getting query")?;
