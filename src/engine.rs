@@ -111,6 +111,7 @@ impl Engine {
 
         let result: Option<Entry> = self.lsm.get(key);
         if let Some(entry) = result {
+            self.cache.add(&entry.key, entry.value.clone().as_deref());
             println!("ENTRY: {:?}", entry);
         } else {
             println!("KEY NOT FOUND");
@@ -139,7 +140,16 @@ impl Engine {
 
     fn delete(&mut self, key: String) -> Result<()> {
         let entry = MemtableEntry::new(get_timestamp()?, key, None);
-        self.memtable.delete(entry);
+        let walentry = Entry::from(&entry);
+        self.wal.add(&walentry).context("adding to WAL")?;
+        if let Some(result) = self.memtable.delete(entry) {
+            if let Ok(_) = result {
+                println!("OK DELETE");
+                return self.handle_memtable_flush();
+            } else {
+                return result;
+            }
+        }
         Ok(())
     }
 
