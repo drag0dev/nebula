@@ -1,10 +1,11 @@
 use crate::building_blocks::{
-    BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
-    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch, SimHash,
+    BTree, BloomFilter, Cache, CountMinSketch, Entry, HyperLogLog, LSMTree, LSMTreeInterface,
+    Memtable, MemtableEntry, SimHash, SkipList, WriteAheadLog, WriteAheadLogReader, SF, MF
 };
-use crate::repl::{Commands, BloomFilterCommands, HLLCommands, CMSCommands, SimHashCommands};
+use crate::building_blocks::FileOrganization::{SingleFile, MultiFile};
 use crate::repl::REPL;
-use crate::utils::config::Config;
+use crate::repl::{BloomFilterCommands, CMSCommands, Commands, HLLCommands, SimHashCommands};
+use crate::utils::config::{Config, MemtableStorage};
 use anyhow::{Context, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,39 +22,62 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn lsm_init() {
+
+    }
     pub fn new() -> Result<Self> {
-        let config = Config::default();
-        // OR
-        // let config = Config::load_from_file().context("reading json")?;
-
-        let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
-
-        //let mut memtable = Memtable::new(
-        //    Box::new(b_tree),
-        //    2,
-        //    crate::building_blocks::FileOrganization::SingleFile(()),
-        //    0.1,
-        //    50,
-        //    String::from("data/table_data"),
-        //);
+        let config;
+        if let Ok(ok_config) = Config::load_from_file().context("failed to load config, defaulting") {
+            config = ok_config;
+        } else {
+            config = Config::default();
+        }
 
         let memtable_vars = config.memtable.get_values();
+        let mut memtable;
+        match memtable_vars.0 {
+            MemtableStorage::BTree => {
+                let storage: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
 
-        let mut memtable = Memtable::new(
-            Box::new(b_tree),
-            memtable_vars.0,
-            memtable_vars.1,
-            memtable_vars.2,
-            memtable_vars.3,
-            memtable_vars.4,
-        );
+                memtable = Memtable::new(
+                    Box::new(storage),
+                    memtable_vars.1,
+                    memtable_vars.2,
+                    memtable_vars.3,
+                    memtable_vars.4,
+                    memtable_vars.5,
+                );
+            }
+            MemtableStorage::SkipList => {
+                let storage: SkipList<MemtableEntry> = SkipList::new(config.skiplist.get_values());
+
+                memtable = Memtable::new(
+                    Box::new(storage),
+                    memtable_vars.1,
+                    memtable_vars.2,
+                    memtable_vars.3,
+                    memtable_vars.4,
+                    memtable_vars.5,
+                );
+            }
+        }
+
+        let engine = Engine {
+            memtable,
+            cache,
+            wal,
+            lsm: Box::new(lsm),
+        };
 
         let lsm_vars = config.lsm.get_values();
-
-        // TODO: I don't know how to add this to the turbofish
-        let file_org_idk = lsm_vars.0;
-        let mut lsm =
-            LSMTree::<SF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3, lsm_vars.4, lsm_vars.5);
+        match lsm_vars.0 {
+            SingleFile(()) => {
+                LSMTree::<SF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
+            },
+            MultiFile(()) => {
+                LSMTree::<MF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
+            }
+        };
 
         // load data if found
         lsm.load().context("loading data into lsm")?;
@@ -75,7 +99,7 @@ impl Engine {
 
                 // Entry path
                 if entry.value.is_some() {
-                    let mementry = MemtableEntry::new( entry.timestamp, key.clone(), entry.value);
+                    let mementry = MemtableEntry::new(entry.timestamp, key.clone(), entry.value);
 
                     memtable.create(mementry);
                     continue;
@@ -100,12 +124,7 @@ impl Engine {
 
         let cache = Cache::new(400);
 
-        Ok(Engine {
-            memtable,
-            cache,
-            wal,
-            lsm: Box::new(lsm),
-        })
+        Ok(engine)
     }
 
     pub fn start(&mut self) -> Result<()> {
@@ -145,7 +164,8 @@ impl Engine {
     fn quit(&mut self) -> Result<()> {
         if self.memtable.len > 0 {
             self.memtable.flush().context("flushing memtable")?;
-            self.handle_memtable_flush().context("handling memtable flush")?;
+            self.handle_memtable_flush()
+                .context("handling memtable flush")?;
         }
 
         self.wal.purge().context("purging wal")
@@ -165,7 +185,8 @@ impl Engine {
             if entry.is_some() {
                 if !is_key_reserved(&key) {
                     println!("Key: {strkey}");
-                    let value = String::from_utf8(entry.as_ref().unwrap().to_vec()).context("converting key to string")?;
+                    let value = String::from_utf8(entry.as_ref().unwrap().to_vec())
+                        .context("converting key to string")?;
                     println!("Value: {value}");
                 }
             }
@@ -180,7 +201,9 @@ impl Engine {
         let result: Option<Entry> = self.lsm.get(key);
         if let Some(entry) = result {
             self.cache.add(&entry.key, entry.value.clone().as_deref());
-            if !is_key_reserved(&entry.key) { print_entry(&entry)?; }
+            if !is_key_reserved(&entry.key) {
+                print_entry(&entry)?;
+            }
             return Ok(Some(entry));
         } else {
             println!("Key not found");
@@ -222,33 +245,47 @@ impl Engine {
 
     fn bloomfilter(&mut self, cmd: BloomFilterCommands) -> Result<()> {
         match cmd {
-            BloomFilterCommands::Add { bloom_filter_key, value } => {
-                if !key_starts_with(&bloom_filter_key, "bf_") { return Ok(()) }
+            BloomFilterCommands::Add {
+                bloom_filter_key,
+                value,
+            } => {
+                if !key_starts_with(&bloom_filter_key, "bf_") {
+                    return Ok(());
+                }
                 let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
                 if let Some(bf_ser) = bf_ser {
                     if let Some(bf_value) = bf_ser.value {
                         let mut bf = BloomFilter::deserialize(&bf_value[..])?;
-                        bf.add(&value.as_bytes()[..]).context("adding value to the bloomfilter")?;
+                        bf.add(&value.as_bytes()[..])
+                            .context("adding value to the bloomfilter")?;
                         let bf_ser = bf.serialize()?;
                         self.put(bloom_filter_key, Some(bf_ser))?;
                     } else {
                         println!("Entry not found");
                     }
                 }
-            },
+            }
             BloomFilterCommands::New { bloom_filter_key } => {
-                if !key_starts_with(&bloom_filter_key, "bf_") { return Ok(()) }
+                if !key_starts_with(&bloom_filter_key, "bf_") {
+                    return Ok(());
+                }
                 let bf = BloomFilter::new(5, 0.01);
                 let bf_ser = bf.serialize()?;
                 self.put(bloom_filter_key, Some(bf_ser))?;
-            },
-            BloomFilterCommands::Check { bloom_filter_key, value } => {
-                if !key_starts_with(&bloom_filter_key, "bf_") { return Ok(()) }
+            }
+            BloomFilterCommands::Check {
+                bloom_filter_key,
+                value,
+            } => {
+                if !key_starts_with(&bloom_filter_key, "bf_") {
+                    return Ok(());
+                }
                 let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
                 if let Some(bf_ser) = bf_ser {
                     if let Some(bf_value) = bf_ser.value {
                         let bf = BloomFilter::deserialize(&bf_value[..])?;
-                        let found = bf.check(value.as_bytes())
+                        let found = bf
+                            .check(value.as_bytes())
                             .context("checkign if the value is present in the bf")?;
                         if found {
                             println!("Value is present in the bloomfilter");
@@ -267,13 +304,17 @@ impl Engine {
     fn hll(&mut self, cmd: HLLCommands) -> Result<()> {
         match cmd {
             HLLCommands::New { hll_key } => {
-                if !key_starts_with(&hll_key, "hll_") { return Ok(()) }
+                if !key_starts_with(&hll_key, "hll_") {
+                    return Ok(());
+                }
                 let hll = HyperLogLog::new(8);
                 let hll_ser = hll.serialize()?;
                 self.put(hll_key, Some(hll_ser))?;
             }
             HLLCommands::Add { hll_key, value } => {
-                if !key_starts_with(&hll_key, "hll_") { return Ok(()) }
+                if !key_starts_with(&hll_key, "hll_") {
+                    return Ok(());
+                }
                 let hll = self.get(hll_key.clone().into_bytes())?;
                 if let Some(hll) = hll {
                     if let Some(hll_ser) = hll.value {
@@ -285,9 +326,11 @@ impl Engine {
                         println!("Entry not found");
                     }
                 }
-            },
+            }
             HLLCommands::Count { hll_key } => {
-                if !key_starts_with(&hll_key, "hll_") { return Ok(()) }
+                if !key_starts_with(&hll_key, "hll_") {
+                    return Ok(());
+                }
                 let hll = self.get(hll_key.clone().into_bytes())?;
                 if let Some(hll) = hll {
                     if let Some(hll_ser) = hll.value {
@@ -297,7 +340,7 @@ impl Engine {
                         println!("Entry not found");
                     }
                 }
-            },
+            }
         }
         Ok(())
     }
@@ -305,13 +348,17 @@ impl Engine {
     fn cms(&mut self, cmd: CMSCommands) -> Result<()> {
         match cmd {
             CMSCommands::New { cms_key } => {
-                if !key_starts_with(&cms_key, "cms_") { return Ok(()) }
+                if !key_starts_with(&cms_key, "cms_") {
+                    return Ok(());
+                }
                 let cms = CountMinSketch::new(0.1, 0.1);
                 let cms_ser = cms.serialize()?;
                 self.put(cms_key, Some(cms_ser))?;
-            },
+            }
             CMSCommands::Count { cms_key } => {
-                if !key_starts_with(&cms_key, "cms_") { return Ok(()) }
+                if !key_starts_with(&cms_key, "cms_") {
+                    return Ok(());
+                }
                 let cms_ser = self.get(cms_key.clone().into_bytes())?;
                 if let Some(cms_ser) = cms_ser {
                     if let Some(cms_ser) = cms_ser.value {
@@ -321,9 +368,11 @@ impl Engine {
                         println!("Entry not found");
                     }
                 }
-            },
+            }
             CMSCommands::Add { cms_key, value } => {
-                if !key_starts_with(&cms_key, "cms_") { return Ok(()) }
+                if !key_starts_with(&cms_key, "cms_") {
+                    return Ok(());
+                }
                 let cms_ser = self.get(cms_key.clone().into_bytes())?;
                 if let Some(cms_ser) = cms_ser {
                     if let Some(cms_ser) = cms_ser.value {
@@ -336,7 +385,7 @@ impl Engine {
                         println!("Entry not found");
                     }
                 }
-            },
+            }
         }
         Ok(())
     }
@@ -345,8 +394,8 @@ impl Engine {
         match cmd {
             SimHashCommands::Hash { value } => {
                 // if !key_starts_with(&cms_key, "hs") { return Ok(()) }
-            },
-            SimHashCommands::Similarity { left, right } => { }
+            }
+            SimHashCommands::Similarity { left, right } => {}
         }
         Ok(())
     }
@@ -405,7 +454,10 @@ fn is_key_reserved(input: &[u8]) -> bool {
 fn key_starts_with(key: &str, prefix: &str) -> bool {
     let key_vec = key.as_bytes();
     if !key_vec.starts_with(prefix.as_bytes()) {
-        println!("key {} doesnt start with the reserved prefix {}", key, prefix);
+        println!(
+            "key {} doesnt start with the reserved prefix {}",
+            key, prefix
+        );
         return false;
     }
     true

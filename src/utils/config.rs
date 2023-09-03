@@ -201,11 +201,15 @@ impl HLLConfig {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum MemtableStorage {
+    BTree,
+    SkipList
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MemtableConfig {
-    // TODO BOX DYN TRAIT DOESNT IMPL SERIALIEZ
-    // storage: Box<dyn StorageCRUD>,
+    storage: MemtableStorage,
     capacity: u64,
     sstable_type: FileOrganization,
     fp_prob: f64,
@@ -216,6 +220,7 @@ pub struct MemtableConfig {
 impl MemtableConfig {
     pub fn default() -> Self {
         MemtableConfig {
+            storage: MemtableStorage::BTree,
             capacity: 50,
             sstable_type: FileOrganization::MultiFile(()),
             fp_prob: 0.01,
@@ -223,8 +228,9 @@ impl MemtableConfig {
             data_folder: String::from("data/table_data"),
         }
     }
-    pub fn get_values(&self) -> (u64, FileOrganization, f64, u64, String) {
+    pub fn get_values(&self) -> (MemtableStorage, u64, FileOrganization, f64, u64, String) {
         (
+            self.storage,
             self.capacity,
             self.sstable_type.clone(),
             self.fp_prob,
