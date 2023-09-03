@@ -202,7 +202,12 @@ impl SSTableBuilderSingleFile {
         // keeps the first entry in the current range
         let mut first_key_range = Some(Rc::clone(&first_entry));
         // keeps the last written entry
-        let mut last_key_range = Rc::new(index_iter.next().expect("there is always atleast second entry")?);
+        let mut last_key_range = if let Some(entry) = index_iter.next() {
+            Rc::new(entry?)
+        } else {
+            Rc::clone(&first_entry)
+        };
+
         let mut counter = 2;
         let mut current_range_offset = self.header.index_offset;
 
