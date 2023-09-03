@@ -8,17 +8,9 @@ pub struct SimHash {
 }
 
 impl SimHash {
-    pub fn new() -> Self {
-        let stopwords: HashSet<String> = [
-            "this", "is", "a", "with", "to", "the", "some",
-            // Add more stopwords here
-        ]
-        .iter()
-        .map(|&word| word.to_string())
-        .collect();
-
+    pub fn new(simhash: u64, stopwords: HashSet<String>) -> Self {
         SimHash {
-            simhash: 0,
+            simhash,
             stopwords,
         }
     }
