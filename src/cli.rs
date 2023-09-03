@@ -5,10 +5,10 @@ use clap::Parser;
 #[command(name = "nebula")]
 pub enum CliCommands {
     /// create a new instance of the database, if it already exists it will fail
-    Initialize,
+    Init,
 
     /// deletes all the data excluding the config
-    Delete,
+    Clear,
 
     /// start the database
     Start,

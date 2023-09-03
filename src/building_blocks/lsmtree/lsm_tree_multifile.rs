@@ -322,7 +322,7 @@ impl LSMTree<MF> {
                 }
                 None => {
                     // If there are no more entries, resolve the remaining entries
-                    println!("Resolving remaining entries...\n");
+                    // println!("Resolving remaining entries...\n");
                     if let Some(resolved_entry) =
                         self.resolve_entries(&mut relevant_entries, level_num)
                     {
