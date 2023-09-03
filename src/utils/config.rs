@@ -22,6 +22,7 @@ pub struct Config {
     pub ssconfig: SSTableConfig,
     pub skiplist: SkipListConfig,
     pub simhash: SimHashConfig,
+    pub memtable: MemtableConfig,
 }
 
 impl Config {
@@ -35,6 +36,7 @@ impl Config {
             ssconfig: SSTableConfig::default(),
             skiplist: SkipListConfig::default(),
             simhash: SimHashConfig::default(),
+            memtable: MemtableConfig::default(),
         }
     }
 
