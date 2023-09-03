@@ -1,8 +1,8 @@
 use crate::building_blocks::{
     BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
-    WriteAheadLogReader, SF, BloomFilter, HyperLogLog,
+    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch,
 };
-use crate::repl::{Commands, BloomFilterCommands, HLLCommands};
+use crate::repl::{Commands, BloomFilterCommands, HLLCommands, CMSCommands};
 use crate::repl::REPL;
 use anyhow::{Context, Result};
 use std::cell::RefCell;
@@ -10,6 +10,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // TODO: add config as a field to the engine
+// TODO: cms input value when counting?
 
 pub struct Engine {
     memtable: Memtable,
@@ -106,6 +107,7 @@ impl Engine {
                     }
                     Commands::Bf(cmd) => self.bloomfilter(cmd)?,
                     Commands::Hll(cmd) => self.hll(cmd)?,
+                    Commands::Cms(cmd) => self.cms(cmd)?,
                     Commands::Quit => {
                         println!("quitting...");
                         self.quit().context("quitting")?;
@@ -257,6 +259,42 @@ impl Engine {
                     if let Some(hll_ser) = hll.value {
                         let hll = HyperLogLog::deserialize(&hll_ser[..])?;
                         println!("Count: {}", hll.count());
+                    } else {
+                        println!("Entry not found");
+                    }
+                }
+            },
+        }
+        Ok(())
+    }
+
+    fn cms(&mut self, cmd: CMSCommands) -> Result<()> {
+        match cmd {
+            CMSCommands::New { cms_key } => {
+                let cms = CountMinSketch::new(0.1, 0.1);
+                let cms_ser = cms.serialize()?;
+                self.put(cms_key, Some(cms_ser))?;
+            },
+            CMSCommands::Count { cms_key } => {
+                let cms_ser = self.get(cms_key.clone().into_bytes())?;
+                if let Some(cms_ser) = cms_ser {
+                    if let Some(cms_ser) = cms_ser.value {
+                        let cms = CountMinSketch::deserialize(&cms_ser)?;
+                        println!("Count: {}", cms.count("").context("counting in cms")?);
+                    } else {
+                        println!("Entry not found");
+                    }
+                }
+            },
+            CMSCommands::Add { cms_key, value } => {
+                let cms_ser = self.get(cms_key.clone().into_bytes())?;
+                if let Some(cms_ser) = cms_ser {
+                    if let Some(cms_ser) = cms_ser.value {
+                        let mut cms = CountMinSketch::deserialize(&cms_ser)?;
+                        cms.add(&value)?;
+                        let cms_ser = cms.serialize()?;
+                        self.put(cms_key, Some(cms_ser))?;
+                        println!("Count: {}", cms.count("").context("counting in cms")?);
                     } else {
                         println!("Entry not found");
                     }
