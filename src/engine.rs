@@ -1,8 +1,8 @@
 use crate::building_blocks::{
     BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
-    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch,
+    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch, SimHash,
 };
-use crate::repl::{Commands, BloomFilterCommands, HLLCommands, CMSCommands};
+use crate::repl::{Commands, BloomFilterCommands, HLLCommands, CMSCommands, SimHashCommands};
 use crate::repl::REPL;
 use anyhow::{Context, Result};
 use std::cell::RefCell;
@@ -108,6 +108,7 @@ impl Engine {
                     Commands::Bf(cmd) => self.bloomfilter(cmd)?,
                     Commands::Hll(cmd) => self.hll(cmd)?,
                     Commands::Cms(cmd) => self.cms(cmd)?,
+                    Commands::Sh(cmd) => self.simhash(cmd)?,
                     Commands::Quit => {
                         println!("quitting...");
                         self.quit().context("quitting")?;
@@ -300,6 +301,14 @@ impl Engine {
                     }
                 }
             },
+        }
+        Ok(())
+    }
+
+    fn simhash(&mut self, cmd: SimHashCommands) -> Result<()> {
+        match cmd {
+            SimHashCommands::Hash { value } => { },
+            SimHashCommands::Similarity { left, right } => { }
         }
         Ok(())
     }

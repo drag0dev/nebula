@@ -14,6 +14,7 @@ chrono = "0.4.26"
 clap = { version = "4.3.21", features = ["derive"] }
 crc = "3.0.1"
 fnv = "1.0.7"
+hex = "0.4.3"
 lazy_static = "1.4.0"
 memmap2 = "0.7.1"
 murmur3 = "0.5.2"

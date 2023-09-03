@@ -1,7 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use bincode::Options;
+use anyhow::{Result, Context};
+use serde::{Serialize, Deserialize};
+use super::BINCODE_OPTIONS;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SimHash {
     simhash: u64,
     stopwords: HashSet<String>,
@@ -43,7 +47,7 @@ impl SimHash {
             let hash_chars: Vec<char> = hash.chars().collect();
             self.update_weighted_bits(&mut weighted_bits, &hash_chars, *count);
         }
-        
+
         self.calculate_fingerprint(&mut weighted_bits);
     }
 
@@ -51,7 +55,7 @@ impl SimHash {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         s.hash(&mut hasher);
         // Formats the hash as a binary string with leading zeros
-        format!("{:064b}", hasher.finish()) 
+        format!("{:064b}", hasher.finish())
     }
 
     pub fn update_weighted_bits(&mut self, weighted_bits: &mut Vec<i32>, hash_chars: &[char], count: i32) {
@@ -74,7 +78,7 @@ impl SimHash {
         }
     }
 
-    pub fn calculate_from_text(&mut self, text: &str) -> u64 { 
+    pub fn calculate_from_text(&mut self, text: &str) -> u64 {
         self.calculate(text);
         self.fingerprint()
     }
@@ -83,6 +87,17 @@ impl SimHash {
         self.simhash
     }
 
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(BINCODE_OPTIONS
+            .serialize(self)
+            .context("serializing simahsh")?)
+    }
+
+    pub fn deserialize(input: &[u8]) -> Result<Self> {
+        Ok(BINCODE_OPTIONS
+            .deserialize(input)
+            .context("deserializing simhash")?)
+    }
 }
 
 pub fn hamming_distance(a: u64, b: u64) -> u32 {
@@ -92,7 +107,7 @@ pub fn hamming_distance(a: u64, b: u64) -> u32 {
 // Calculate similarity based on the Hamming distance
 pub fn similarity(hash1: u64, hash2: u64) -> f64 {
     let distance: f64 = hamming_distance(hash1, hash2) as f64;
-    1.0 - (distance / 64.0)  
+    1.0 - (distance / 64.0)
 }
 
 #[cfg(test)]
@@ -189,7 +204,7 @@ mod tests {
         assert_eq!(word_counts.get("is"), None);   // Stopword
         assert_eq!(word_counts.get("a"), None);    // Stopword
     }
-    
+
     #[test]
     fn test_calculate_from_text() {
 
