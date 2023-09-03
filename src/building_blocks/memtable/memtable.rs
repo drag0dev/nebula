@@ -44,8 +44,10 @@ where
     }
 
     pub fn create(&mut self, entry: MemtableEntry) -> Option<Result<()>> {
+        if self.storage.read(entry.key.clone()).is_none() {
+            self.len += 1;
+        }
         self.storage.create(entry);
-        self.len += 1;
 
         assert!(self.len <= self.capacity);
         if self.len == self.capacity {
@@ -59,8 +61,10 @@ where
     }
 
     pub fn update(&mut self, entry: MemtableEntry) -> Option<Result<()>> {
+        if self.storage.read(entry.key.clone()).is_none() {
+            self.len += 1;
+        }
         self.storage.update(entry);
-        self.len += 1;
 
         assert!(self.len <= self.capacity);
         if self.len == self.capacity {
@@ -70,8 +74,10 @@ where
     }
 
     pub fn delete(&mut self, entry: MemtableEntry) -> Option<Result<()>> {
+        if self.storage.read(entry.key.clone()).is_none() {
+            self.len += 1;
+        }
         self.storage.delete(entry);
-        self.len += 1;
 
         assert!(self.len <= self.capacity);
         if self.len == self.capacity {
