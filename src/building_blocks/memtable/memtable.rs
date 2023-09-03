@@ -108,7 +108,7 @@ impl Memtable
         res
     }
 
-    fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         let wrapped_entries = self.storage.entries();
         let ref_entries = wrapped_entries
             .iter()

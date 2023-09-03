@@ -1,12 +1,13 @@
 use crate::building_blocks::{
-    BTree, Cache, Entry, LSMTree,
-    Memtable, MemtableEntry, WriteAheadLog,
-    SF, LSMTreeInterface,
+    BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
+    WriteAheadLogReader, SF,
 };
 use crate::repl::Commands;
 use crate::repl::REPL;
 use anyhow::{Context, Result};
 use std::cell::RefCell;
+use std::mem;
+use std::process::exit;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -17,12 +18,11 @@ pub struct Engine {
     lsm: Box<dyn LSMTreeInterface>,
 }
 
-
 impl Engine {
     pub fn new() -> Result<Self> {
         let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
 
-        let memtable = Memtable::new(
+        let mut memtable = Memtable::new(
             Box::new(b_tree),
             2,
             crate::building_blocks::FileOrganization::SingleFile(()),
@@ -31,12 +31,62 @@ impl Engine {
             String::from("data/table_data"),
         );
 
+        let mut lsm = LSMTree::<SF>::new(0.1, 100, String::from("data/table_data"), 3, 3);
+
+        // load data if found
+        lsm.load().context("loading data into lsm")?;
+
+        let mut wal = WriteAheadLog::new("data/WAL", 2000).context("creating WAL")?;
+
+        let mut wal_reader =
+            WriteAheadLogReader::iter("data/WAL").context("getting wal_reader iter")?;
+
+        // if wal has entries, rebuild memtable and purge wal
+        while let Some(vec_entries) = wal_reader.next() {
+            let mut entries = vec_entries.context("unrwrapping entries")?;
+
+            while let Some(entry) = entries.pop() {
+                let timestamp = entry.timestamp;
+                let key = String::from_utf8(entry.key).context("converting key to String")?;
+
+                let value;
+
+                // Entry path
+                if entry.value.is_some() {
+                    let strval = String::from_utf8(entry.value.unwrap())
+                        .context("converting val to String")?;
+
+                    value = Some(strval);
+
+                    let mementry = MemtableEntry {
+                        timestamp: entry.timestamp,
+                        key: key.clone(),
+                        value,
+                    };
+
+                    memtable.create(mementry);
+                    continue;
+                }
+
+                // tombstone path
+                let tombstone = MemtableEntry {
+                    timestamp,
+                    key,
+                    value: None,
+                };
+
+                if let Some(result) = memtable.delete(tombstone) {
+                    if let Ok(_) = result {
+                        // println!("flushing");
+                        lsm.insert("memtable")
+                            .context("inserting memetable into lsm")?;
+                    }
+                }
+            }
+        }
+        wal.purge().context("purging wal")?;
+
         let cache = Cache::new(400);
-
-        let wal = WriteAheadLog::new("data/WAL", 2000).context("creating WAL")?;
-
-        let lsm = LSMTree::<SF>::new(0.1, 100, String::from("data/table_data"), 3, 3);
-
 
         Ok(Engine {
             memtable,
@@ -46,23 +96,12 @@ impl Engine {
         })
     }
 
+    fn check_existing() {}
+
+    fn load_existing() {}
+
     pub fn start(&mut self) -> Result<()> {
         // check for existing data and integrity
-        //		 -> init the structs
-        //		-> call repl REPLnew getquery
-        //		  -> match the repl commands -> do something writepath or readpath
-        //		-> put and delete (the mutable things go to WAL then memtable)
-        //		-> list range?
-        //		  -> bf command?
-        //		  -> quit() (flush memtable and purge WAL) then u can quit gracefully
-        //		-> bubble any errors up to main() and then just print it
-        //		  -> printError()
-        //	delete delet all local files (rename test-data -> data)
-        //	init not required? ---
-        //
-        //
-
-        // check existing data and integrity
 
         let mut repl = REPL::new();
         loop {
@@ -83,10 +122,14 @@ impl Engine {
                         println!("DELETE: {}", key);
                     }
                     Commands::Quit => {
-                        println!("QUIT");
+                        println!("quitting...");
+                        self.quit().context("quitting")?;
+                        // flush memtable
+                        // purge wal
+                        // exit
                         break;
                     }
-                    _ => { }
+                    _ => {}
                 }
             } else {
                 query.context("getting query")?;
@@ -95,6 +138,13 @@ impl Engine {
         Ok(())
     }
 
+    fn quit(&mut self) -> Result<()> {
+        self.memtable.flush().context("flushing memtable")?;
+
+        self.wal.purge().context("purging wal")?;
+
+        exit(1);
+    }
 
     fn get(&mut self, key: Vec<u8>) -> Result<()> {
         let strkey = String::from_utf8(key.clone()).context("converting key to string")?;
@@ -161,8 +211,8 @@ impl Engine {
 }
 
 fn get_timestamp() -> Result<u128> {
-        Ok(SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .context("getting epoch time")?
-            .as_nanos())
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("getting epoch time")?
+        .as_nanos())
 }

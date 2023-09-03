@@ -204,7 +204,6 @@ impl LSMTree<MF> {
 
         if self.levels[level_num + 1].nodes.len() >= self.size_threshold {
             let msg = format!("MERGING RECURSE {level_num} -> {}", level_num + 1);
-            println!("{}", msg);
             self.merge(level_num + 1, dirname).context(msg)?;
         }
 
@@ -256,8 +255,6 @@ impl LSMTreeInterface for LSMTree<MF> {
         // create_dir(&new_path).context("creating empty dir").unwrap();
 
         rename(path, new_path).context("renaming sstable")?;
-
-        println!("okRENAMED {table_name}");
 
         self.last_table += 1;
 
@@ -366,7 +363,6 @@ impl LSMTreeInterface for LSMTree<MF> {
         let paths =
             std::fs::read_dir(self.data_dir.clone()).context("reading directory contents")?;
 
-        println!("dir mfw {}", self.data_dir.clone());
 
         for file in paths {
             let filepath = file.context("reading filename").unwrap().path();
@@ -376,11 +372,9 @@ impl LSMTreeInterface for LSMTree<MF> {
                 .and_then(|name| name.to_str())
                 .expect("Failed to convert OsStr to String");
 
-            println!("paths mfw {dir_name}");
 
             let mut tokens: Vec<&str> = dir_name.split("-").collect();
             tokens.reverse();
-            println!("{}", tokens[1]);
             let level = tokens[1].parse::<usize>().context("parsing level num")?;
 
             if self.levels.len() > level {

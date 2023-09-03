@@ -315,8 +315,6 @@ impl LSMTreeInterface for LSMTree<SF> {
         let paths =
             std::fs::read_dir(self.data_dir.clone()).context("reading directory contents")?;
 
-        println!("dir mfw {}", self.data_dir.clone());
-
         for file in paths {
             let filepath = file.context("reading filename").unwrap().path();
 
@@ -325,11 +323,8 @@ impl LSMTreeInterface for LSMTree<SF> {
                 .and_then(|name| name.to_str())
                 .expect("Failed to convert OsStr to String");
 
-            println!("paths mfw {dir_name}");
-
             let mut tokens: Vec<&str> = dir_name.split("-").collect();
             tokens.reverse();
-            println!("{}", tokens[1]);
             let level = tokens[1].parse::<usize>().context("parsing level num")?;
 
             if self.levels.len() > level {
@@ -372,7 +367,7 @@ impl LSMTreeInterface for LSMTree<SF> {
     ///     3    // size_threshold: usize,
     /// );
     /// lsm.insert("new_sstable").unwrap();
-    ///
+    //?/
     /// let key: Vec<u8> = Vec::from("joe");
     /// let out = lsm.get(key);
     /// assert!(out.is_some());
