@@ -1,13 +1,9 @@
 use crate::building_blocks::{
-    BTree, Cache, Entry, LSMTree, Memtable, MemtableEntry, StorageCRUD, WriteAheadLog, SF,
+    BTree, Cache, Entry, LSMTree, Memtable, MemtableEntry, WriteAheadLog, SF,
 };
-use crate::cli;
-use crate::cli::CliCommands;
-use crate::print_err;
 use crate::repl::Commands;
 use crate::repl::REPL;
-use anyhow::{Context, Error, Result};
-use clap::Parser;
+use anyhow::{Context, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,12 +13,6 @@ pub struct Engine {
     cache: Cache,
     wal: WriteAheadLog,
     lsm: LSMTree<SF>,
-}
-
-macro_rules! fuckoff {
-    () => {
-        todo!();
-    };
 }
 
 impl Engine {
@@ -53,23 +43,6 @@ impl Engine {
         })
     }
 
-    fn init(&self) {}
-
-    fn delete(&mut self, key: String) -> Result<()> {
-        if let Ok(None) = self.get(Vec::from(key.clone())) {
-            println!("KEY NOT FOUND");
-        } else {
-            // TODO:
-            // how am I supposed to remove an entry by key
-            // if the delete takes an entry
-            // self.memtable.delete(entry);
-
-            self.put(key, None).context("deleting entry")?;
-        }
-
-        Ok(())
-    }
-
     pub fn start(&mut self) -> Result<()> {
         // check for existing data and integrity
         //		 -> init the structs
@@ -90,10 +63,11 @@ impl Engine {
 
         let mut repl = REPL::new();
         loop {
-            if let Ok(query) = repl.get_query() {
+            let query = repl.get_query();
+            if let Ok(query) = query {
                 match query.commands {
                     Commands::Get { key } => {
-                        let vec_key = Vec::from(key.clone());
+                        let vec_key = key.as_bytes().to_vec();
                         self.get(vec_key).context("getting entry from lsm")?;
                     }
                     Commands::Put { key, value } => {
@@ -106,24 +80,30 @@ impl Engine {
                         println!("DELETE: {}", key);
                     }
                     Commands::Quit => {
-                        println!("QUIT")
+                        println!("QUIT");
+                        break;
                     }
-                    _ => {
-                        fuckoff!();
-                    }
+                    _ => { }
                 }
             } else {
-                println!("dumbass");
+                query.context("getting query")?;
             }
         }
+        Ok(())
     }
 
-    fn get(&mut self, key: Vec<u8>) -> Result<Option<()>> {
+
+    fn get(&mut self, key: Vec<u8>) -> Result<()> {
         let strkey = String::from_utf8(key.clone()).context("converting key to string")?;
-        let result = self.memtable.read(strkey);
+        let result = self.memtable.read(strkey.clone());
         if let Some(mem_entry) = result {
             println!("ENTRY: {:?}", mem_entry);
-            return Ok(Some(()));
+            return Ok(());
+        }
+
+        if let Some(entry) = self.cache.find(&key[..]) {
+            println!("ENTRY: {:?}", entry);
+            return Ok(());
         }
 
         let result: Option<Entry> = self.lsm.get(key);
@@ -131,24 +111,13 @@ impl Engine {
             println!("ENTRY: {:?}", entry);
         } else {
             println!("KEY NOT FOUND");
-            return Ok(None);
         }
 
-        Ok(Some(()))
+        Ok(())
     }
 
     fn put(&mut self, key: String, value: Option<String>) -> Result<()> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .context("getting epoch time")?;
-        let timestamp = timestamp.as_nanos();
-
-        let mementry: MemtableEntry = MemtableEntry {
-            timestamp,
-            key,
-            value,
-        };
-
+        let mementry = MemtableEntry::new(get_timestamp()?, key, value);
         let walentry = Entry::from(&mementry);
         self.wal.add(&walentry).context("adding to WAL")?;
 
@@ -156,10 +125,7 @@ impl Engine {
         if let Some(result) = self.memtable.create(mementry) {
             if let Ok(_) = result {
                 println!("OK PUT");
-                return self
-                    .lsm
-                    .insert("memtable")
-                    .context("inserting memetable into lsm");
+                return self.handle_memtable_flush();
             } else {
                 return result;
             }
@@ -167,4 +133,23 @@ impl Engine {
 
         Ok(())
     }
+
+    fn delete(&mut self, key: String) -> Result<()> {
+        let entry = MemtableEntry::new(get_timestamp()?, key, None);
+        self.memtable.delete(entry);
+        Ok(())
+    }
+
+    fn handle_memtable_flush(&mut self) -> Result<()> {
+        self.lsm
+            .insert("memtable")
+            .context("inserting memetable into lsm")
+    }
+}
+
+fn get_timestamp() -> Result<u128> {
+        Ok(SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .context("getting epoch time")?
+            .as_nanos())
 }
