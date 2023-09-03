@@ -16,8 +16,7 @@ pub struct SkipList<T> {
 }
 
 impl<T: Ord + Default> SkipList<T> {
-    pub fn new() -> Self {
-        let max_level = 10; 
+    pub fn new(max_level: i32) -> Self {
         let head = Rc::new(RefCell::new(SkipListNode {
             value: Default::default(),
             next_nodes: vec![None; max_level],
