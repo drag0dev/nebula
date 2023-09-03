@@ -159,7 +159,17 @@ impl Engine {
                         self.quit().context("quitting")?;
                         break;
                     }
-                    _ => {}
+
+                    Commands::List { key_prefix, pagination } => {
+                        let result = self.lsm.prefix_scan(&key_prefix).context("running prefix scan")?;
+                        println!("entries {:?}", result);
+                    }
+
+                    Commands::RangeScan { start_key, end_key, pagination } => {
+                        let result = self.lsm.range_scan(&start_key, &end_key).context("running range scan")?;
+                        println!("entries {:?}", result);
+                    }
+
                 }
             } else {
                 query.context("getting query")?;

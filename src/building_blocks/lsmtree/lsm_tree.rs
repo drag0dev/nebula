@@ -30,4 +30,6 @@ pub trait LSMTreeInterface {
     fn get(&self, key: Vec<u8>) -> Option<Entry>;
     fn insert(&mut self, table_name: &str) -> Result<()>;
     fn load(&mut self) -> Result<()>;
+    fn prefix_scan(&mut self, prefix: &str) -> Result<Vec<Entry>>;
+    fn range_scan(&mut self, start_key: &str, end_key:&str) -> Result<Vec<Entry>>;
 }
