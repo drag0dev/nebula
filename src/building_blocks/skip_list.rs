@@ -16,7 +16,7 @@ pub struct SkipList<T> {
 }
 
 impl<T: Ord + Default> SkipList<T> {
-    pub fn new(max_level: i32) -> Self {
+    pub fn new(max_level: usize) -> Self {
 
         let head = Rc::new(RefCell::new(SkipListNode {
             value: Default::default(),
@@ -174,7 +174,9 @@ impl StorageCRUD for SkipList<MemtableEntry> {
     }
 
     fn clear(&mut self) {
-        *self = SkipList::new();
+        for i in 0..self.max_level {
+            self.head.borrow_mut().next_nodes[i] = None;
+        }
     }
 
     fn entries(&self) -> Vec<Rc<RefCell<MemtableEntry>>> {
@@ -222,11 +224,10 @@ mod tests {
 
     #[test]
     fn new_correct_initial_state_test() {
-        let skip_list: SkipList<i32> = SkipList::new();
+        let skip_list: SkipList<i32> = SkipList::new(10);
 
         let head_node = skip_list.head.borrow();
-        assert_eq!(head_node.value, i32::default());
-        assert_eq!(head_node.next_nodes.len(), 10);
+        assert_eq!(head_node.next_nodes.len(), 10); 
 
         for next_node in &head_node.next_nodes {
             assert!(next_node.is_none());
@@ -237,7 +238,7 @@ mod tests {
 
     #[test]
     fn insert_test() {
-        let mut skip_list = SkipList::new();
+        let mut skip_list = SkipList::new(10);
 
         skip_list.insert(3);
         skip_list.insert(7);
@@ -252,7 +253,7 @@ mod tests {
 
     #[test]
     fn delete_test() {
-        let mut skip_list = SkipList::new();
+        let mut skip_list = SkipList::new(10);
 
         skip_list.insert(3);
         skip_list.insert(7);
@@ -270,7 +271,7 @@ mod tests {
 
     #[test]
     fn search_existing_value_test() {
-        let mut skip_list = SkipList::new();
+        let mut skip_list = SkipList::new(10);
         skip_list.insert(10);
         skip_list.insert(15);
         skip_list.insert(20);
@@ -282,7 +283,7 @@ mod tests {
 
     #[test]
     fn search_non_existing_value_test() {
-        let mut skip_list = SkipList::new();
+        let mut skip_list = SkipList::new(10);
         skip_list.insert(10);
         skip_list.insert(15);
         skip_list.insert(20);
@@ -294,7 +295,7 @@ mod tests {
 
     #[test]
         fn get_first_row_nodes_test() {
-            let mut skip_list = SkipList::new();
+            let mut skip_list = SkipList::new(10);
             skip_list.insert(3);
             skip_list.insert(7);
             skip_list.insert(1);
