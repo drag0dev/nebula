@@ -118,9 +118,6 @@ impl Engine {
                     Commands::Quit => {
                         println!("quitting...");
                         self.quit().context("quitting")?;
-                        // flush memtable
-                        // purge wal
-                        // exit
                         break;
                     }
                     _ => {}
@@ -134,10 +131,9 @@ impl Engine {
 
     fn quit(&mut self) -> Result<()> {
         self.memtable.flush().context("flushing memtable")?;
+        self.handle_memtable_flush().context("handling memtable flush")?;
 
-        self.wal.purge().context("purging wal")?;
-
-        exit(0);
+        self.wal.purge().context("purging wal")
     }
 
     fn get(&mut self, key: Vec<u8>) -> Result<()> {
