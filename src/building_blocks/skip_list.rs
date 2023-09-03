@@ -150,7 +150,7 @@ impl StorageCRUD for SkipList<MemtableEntry> {
     }
 
     fn read(&mut self, key: String) -> Option<Rc<RefCell<MemtableEntry>>> {
-        let search_result = self.search(MemtableEntry::new(0, key.clone(), None));
+        let search_result = self.search(MemtableEntry::new_string(0, key.clone(), None));
         if let Some(node) = search_result {
             let value = node.borrow().value.clone();
             let entry = MemtableEntry::new(value.timestamp, value.key.clone(), value.value.clone());
@@ -227,7 +227,7 @@ mod tests {
         let skip_list: SkipList<i32> = SkipList::new(10);
 
         let head_node = skip_list.head.borrow();
-        assert_eq!(head_node.next_nodes.len(), 10); 
+        assert_eq!(head_node.next_nodes.len(), 10);
 
         for next_node in &head_node.next_nodes {
             assert!(next_node.is_none());

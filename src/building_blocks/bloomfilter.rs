@@ -3,7 +3,7 @@ use bincode::Options;
 use bitvec::prelude::BitVec;
 use crc::{Crc, CRC_32_JAMCRC};
 use murmur3::murmur3_x64_128;
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, Context, anyhow, Ok};
 use rand::Rng;
 use crate::utils::helpers::*;
 use serde::{Serialize, Deserialize};
@@ -134,6 +134,18 @@ impl BloomFilter{
             .context("writing filter to the file")?;
 
         Ok(())
+    }
+
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(BINCODE_OPTIONS
+            .serialize(self)
+            .context("serializing bloomfilter")?)
+    }
+
+    pub fn deserialize(&self, input: &[u8]) -> Result<Self> {
+        Ok(BINCODE_OPTIONS
+            .deserialize(input)
+            .context("deserializing bloomfilter")?)
     }
 
 }
