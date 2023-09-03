@@ -136,6 +136,7 @@ pub fn open_file(dir: &str, name: &str) -> Result<File> {
     let file_path = format!("{}/{}", dir, name);
     let file = OpenOptions::new()
         .read(true)
+        .write(true)
         .open(file_path)?;
     Ok(file)
 }

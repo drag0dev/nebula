@@ -16,6 +16,7 @@ impl SSTableReaderSingleFile {
     pub fn load(sstabel_dir: &str) -> Result<Self> {
         let file = OpenOptions::new()
             .read(true)
+            .write(true)
             .open(format!("{}/data", sstabel_dir))
             .context("opening sstable file")?;
         SSTableReaderSingleFile::read_sstable(file)
