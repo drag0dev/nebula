@@ -96,13 +96,7 @@ impl Engine {
         })
     }
 
-    fn check_existing() {}
-
-    fn load_existing() {}
-
     pub fn start(&mut self) -> Result<()> {
-        // check for existing data and integrity
-
         let mut repl = REPL::new();
         loop {
             let query = repl.get_query();
@@ -143,7 +137,7 @@ impl Engine {
 
         self.wal.purge().context("purging wal")?;
 
-        exit(1);
+        exit(0);
     }
 
     fn get(&mut self, key: Vec<u8>) -> Result<()> {
