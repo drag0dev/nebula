@@ -92,7 +92,7 @@ impl LSMTree<MF> {
         let mut out_entries: Vec<Entry> = vec![];
 
         // read all files in data dir
-        let files = read_dir(self.data_dir).context("reading data dir")?;
+        let files = read_dir(self.data_dir.clone()).context("reading data dir")?;
 
         // get filenames and create a vec of table iterators from each file
         let mut iterators: Vec<_> = files
