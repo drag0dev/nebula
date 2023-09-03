@@ -1,6 +1,6 @@
 use crate::building_blocks::{
-    BTree, BloomFilter, Cache, CountMinSketch, Entry, HyperLogLog, LSMTree, LSMTreeInterface,
-    Memtable, MemtableEntry, SimHash, SkipList, WriteAheadLog, WriteAheadLogReader, SF, MF
+    BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
+    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch, SimHash, SkipList, MF, BINCODE_OPTIONS, similarity,
 };
 use crate::building_blocks::FileOrganization::{SingleFile, MultiFile};
 use crate::repl::REPL;
@@ -8,8 +8,10 @@ use crate::repl::{BloomFilterCommands, CMSCommands, Commands, HLLCommands, SimHa
 use crate::utils::config::{Config, MemtableStorage};
 use anyhow::{Context, Result};
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use bincode::Options;
 
 // TODO: add config as a field to the engine
 // TODO: cms input value when counting?
@@ -225,13 +227,13 @@ impl Engine {
         // I don't know why it only works this way
         if let Some(result) = self.memtable.create(mementry) {
             if let Ok(_) = result {
-                return self.handle_memtable_flush();
+                self.handle_memtable_flush()
             } else {
-                return result;
+                result
             }
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn delete(&mut self, key: String) -> Result<()> {
@@ -397,10 +399,43 @@ impl Engine {
 
     fn simhash(&mut self, cmd: SimHashCommands) -> Result<()> {
         match cmd {
-            SimHashCommands::Hash { value } => {
-                // if !key_starts_with(&cms_key, "hs") { return Ok(()) }
+            SimHashCommands::Hash { key, value } => {
+                if !key_starts_with(&key, "sh_") { return Ok(()) }
+                let stopwortds = HashSet::from(["this".to_owned()]);
+                let mut sh = SimHash::new(0, stopwortds);
+                sh.calculate(&value);
+
+                let fingerprint = sh.fingerprint();
+                let fingerpint_ser = BINCODE_OPTIONS.serialize(&fingerprint)?;
+                self.put(key, Some(fingerpint_ser))?;
+            },
+            SimHashCommands::Similarity { left_key, right_key } => {
+                if !key_starts_with(&left_key, "sh_") { return Ok(()) }
+                if !key_starts_with(&right_key, "sh_") { return Ok(()) }
+                let left_footprint;
+                let left = self.get(left_key.clone().into_bytes())?;
+                if let Some(left) = left {
+                    if let Some(left_ser) = left.value {
+                        left_footprint = BINCODE_OPTIONS.deserialize(&left_ser[..])?;
+                    } else {
+                        println!("Key {} not found", left_key);
+                        return Ok(());
+                    }
+                } else {return Ok(())}
+
+                let right_footprint;
+                let right = self.get(right_key.clone().into_bytes())?;
+                if let Some(right) = right {
+                    if let Some(right_ser) = right.value {
+                        right_footprint = BINCODE_OPTIONS.deserialize(&right_ser[..])?;
+                    } else {
+                        println!("Key {} not found", right_key);
+                        return Ok(());
+                    }
+                } else {return Ok(())}
+
+                println!("Similarity: {}", similarity(left_footprint, right_footprint));
             }
-            SimHashCommands::Similarity { left, right } => {}
         }
         Ok(())
     }

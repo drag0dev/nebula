@@ -56,8 +56,8 @@ pub enum BloomFilterCommands {
 // the values are therefore provided in the command in hex format
 #[derive(Debug, Subcommand)]
 pub enum SimHashCommands {
-    Hash { value: String },
-    Similarity {left: String, right: String, }
+    Hash { key: String, value: String },
+    Similarity {left_key: String, right_key: String, }
 }
 
 #[derive(Debug, Subcommand)]
