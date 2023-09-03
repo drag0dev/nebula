@@ -88,7 +88,7 @@ impl LSMTree<MF> {
 
     /// Merges all sstables assigned to a specified level into
     /// an sstable specified by filename
-    pub(super) fn merge_entries(&mut self) -> Result<Vec<Entry>> {
+    pub(super) fn merge_entries(&mut self, prefix: &str) -> Result<Vec<Entry>> {
         let mut out_entries: Vec<Entry> = vec![];
 
         // read all files in data dir
@@ -106,12 +106,7 @@ impl LSMTree<MF> {
                 SSTableReader::load(filepath)
                     .with_context(|| format!("loading {}", filepath))
                     .unwrap()
-
-
-                    ///////////////// TODO replace this with some iter that returns the prefix shit or whatever
-                    .iter()
-
-
+                    .prefix_scan(prefix)
                     .unwrap()
                     .into_iter()
                     .peekable()
@@ -127,12 +122,12 @@ impl LSMTree<MF> {
                 .iter_mut()
                 .enumerate()
                 .filter_map(|(idx, iter)| iter.peek().map(|value| (value, idx)))
-                .min_by_key(|&(value, _)| value.as_ref().unwrap().key.clone());
+                .min_by_key(|&(value, _)| value.key.clone());
 
             match smallest {
                 Some((_, idx)) => {
                     // Consume the value from the corresponding iterator
-                    let entry = iterators[idx].next().unwrap().unwrap();
+                    let entry = iterators[idx].next().unwrap();
                     let key = { entry.key.clone() };
 
                     let entry_ref = Rc::new(entry);

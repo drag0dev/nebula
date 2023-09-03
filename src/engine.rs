@@ -22,11 +22,10 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Result<Self> {
-
         let config = Config::default();
         // OR
         // let config = Config::load_from_file().context("reading json")?;
-        
+
         let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
 
         //let mut memtable = Memtable::new(
@@ -37,25 +36,34 @@ impl Engine {
         //    50,
         //    String::from("data/table_data"),
         //);
-        
+
+        let memtable_vars = config.memtable.get_values();
+
         let mut memtable = Memtable::new(
-            config.memtable.get_values()
-            2,
-            crate::building_blocks::FileOrganization::SingleFile(()),
-            0.1,
-            50,
-            String::from("data/table_data"),
+            Box::new(b_tree),
+            memtable_vars.0,
+            memtable_vars.1,
+            memtable_vars.2,
+            memtable_vars.3,
+            memtable_vars.4,
         );
 
-        let mut lsm = LSMTree::<SF>::new(0.1, 100, String::from("data/table_data"), 3, 3);
+        let lsm_vars = config.lsm.get_values();
+
+        // TODO: I don't know how to add this to the turbofish
+        let file_org_idk = lsm_vars.0;
+        let mut lsm =
+            LSMTree::<SF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3, lsm_vars.4, lsm_vars.5);
 
         // load data if found
         lsm.load().context("loading data into lsm")?;
 
-        let mut wal = WriteAheadLog::new("data/WAL", 2000).context("creating WAL")?;
+        let wal_vars = config.wal.get_values();
+
+        let mut wal = WriteAheadLog::new(&wal_vars.0, wal_vars.1).context("creating WAL")?;
 
         let mut wal_reader =
-            WriteAheadLogReader::iter("data/WAL").context("getting wal_reader iter")?;
+            WriteAheadLogReader::iter(&wal_vars.0).context("getting wal_reader iter")?;
 
         // if wal has entries, rebuild memtable and purge wal
         while let Some(vec_entries) = wal_reader.next() {

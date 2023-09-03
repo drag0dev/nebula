@@ -66,6 +66,40 @@ impl SSTableReaderMultiFile {
         SummaryIterator::iter(fd)
     }
 
+    pub fn prefix_scan(&self, prefix: &str) -> Result<Vec<Entry>> {
+        let (summary_iter, range) = self.summary_iter().context("reading summary")?;
+        if !prefix_intersects(prefix.as_bytes(), &range.first_key[..], &range.last_key[..]) {
+            return Ok(vec![]);
+        }
+
+        let mut index_offset = None;
+        for entry in summary_iter {
+            let entry = entry.context("reading summary entry")?;
+            if prefix_intersects(prefix.as_bytes(), &entry.first_key[..], &entry.last_key[..]) {
+                index_offset = Some(entry.offset);
+            }
+        }
+
+        if index_offset.is_some() {
+            let mut res = Vec::new();
+            let mut index_iter = self.index_iter().context("getting index iterator")?;
+            index_iter.move_iter(index_offset.unwrap()).context("")?;
+            let index_entry = index_iter.next().unwrap().context("reading index entry")?;
+            let mut iter = self.iter().context("getting sstable iter")?;
+            iter.move_iter(index_entry.offset).context("moving sstable iter")?;
+
+            for entry in iter {
+                let entry = entry.context("reading sstable entry")?;
+                if vector_prefix(prefix.as_bytes(), &entry.key[..]) { res.push(entry); }
+                else if end(prefix.as_bytes(), &entry.key[..]) { break; }
+            }
+            Ok(res)
+
+        } else {
+            Ok(vec![])
+        }
+    }
+
     pub fn range_scan(&self, start: &[u8], end: &[u8]) -> Result<Vec<Entry>> {
         let (summary_iter, range) = self.summary_iter().context("reading summary")?;
         if !(&range.first_key[..] <= end && &range.last_key[..] >= start) { return Ok(vec![]); }

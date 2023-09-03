@@ -3,6 +3,7 @@ use crate::building_blocks::{
     SkipListNode, TokenBucket, MF, SF,
 };
 use core::cell::RefCell;
+use crate::building_blocks::StorageCRUD;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -23,6 +24,7 @@ pub struct Config {
     pub skiplist: SkipListConfig,
     pub simhash: SimHashConfig,
     pub memtable: MemtableConfig,
+    pub wal: WALConfig,
 }
 
 impl Config {
@@ -37,6 +39,7 @@ impl Config {
             skiplist: SkipListConfig::default(),
             simhash: SimHashConfig::default(),
             memtable: MemtableConfig::default(),
+            wal: WALConfig::default(),
         }
     }
 
@@ -134,6 +137,7 @@ impl BloomFilterConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LSMTreeConfig {
+    file_organization: FileOrganization,
     fp_prob: f64,
     summary_nth: u64,
     data_dir: String,
@@ -144,6 +148,7 @@ pub struct LSMTreeConfig {
 impl LSMTreeConfig {
     pub fn default() -> Self {
         LSMTreeConfig {
+            file_organization: FileOrganization::MultiFile(()),
             fp_prob: 0.01,
             summary_nth: 50,
             data_dir: String::from("data/table_data"),
@@ -152,8 +157,9 @@ impl LSMTreeConfig {
         }
     }
 
-    pub fn get_values(&self) -> (f64, u64, String, usize, usize) {
+    pub fn get_values(&self) -> (FileOrganization, f64, u64, String, usize, usize) {
         (
+            self.file_organization.clone(),
             self.fp_prob,
             self.summary_nth,
             self.data_dir.clone(),
@@ -195,8 +201,11 @@ impl HLLConfig {
     }
 }
 
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MemtableConfig {
+    // TODO BOX DYN TRAIT DOESNT IMPL SERIALIEZ
+    // storage: Box<dyn StorageCRUD>,
     capacity: u64,
     sstable_type: FileOrganization,
     fp_prob: f64,
@@ -205,22 +214,22 @@ pub struct MemtableConfig {
 }
 
 impl MemtableConfig {
-    fn default() -> Self {
+    pub fn default() -> Self {
         MemtableConfig {
             capacity: 50,
-            sstable_type: FileOrganization::SingleFile(()),
+            sstable_type: FileOrganization::MultiFile(()),
             fp_prob: 0.01,
             summary_nth: 50,
             data_folder: String::from("data/table_data"),
         }
     }
-    fn get_values(&self) -> (u64, FileOrganization, f64, u64, String) {
+    pub fn get_values(&self) -> (u64, FileOrganization, f64, u64, String) {
         (
             self.capacity,
-            self.sstable_type,
+            self.sstable_type.clone(),
             self.fp_prob,
             self.summary_nth,
-            self.data_folder
+            self.data_folder.clone(),
         )
     }
 }
@@ -261,6 +270,21 @@ impl SkipListConfig {
 
     pub fn get_values(&self) -> usize {
         self.max_level
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WALConfig {
+    segment_size: u64,
+    path: String
+}
+
+impl WALConfig {
+    pub fn default() -> Self {
+        WALConfig { segment_size: 2000, path: String::from("data_dir/WAL") } 
+    }
+    pub fn get_values(&self) -> (String, u64) {
+        (self.path.clone(), self.segment_size)
     }
 }
 
