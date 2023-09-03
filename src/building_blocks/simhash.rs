@@ -108,7 +108,15 @@ mod tests {
 
     #[test]
     fn test_update_weighted_bits() {
-        let mut simhash = SimHash::new();
+        let stopwords = vec![
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash = SimHash::new(0, stopwords);
+
         let mut weighted_bits = vec![0; 64];
 
         // Hash a test word
@@ -125,7 +133,16 @@ mod tests {
 
     #[test]
     fn test_calculate_fingerprint() {
-        let mut simhash = SimHash::new();
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash = SimHash::new(0, stopwords);
+
+
         let mut weighted_bits = vec![0; 64];
         weighted_bits[2] = 3;
         simhash.calculate_fingerprint(&mut weighted_bits);
@@ -135,6 +152,7 @@ mod tests {
 
     #[test]
     fn test_similarity() {
+
         let hash1: u64 = 0b1101101;
         let hash2: u64 = 0b1101110;
         let similarity = similarity(hash1, hash2);
@@ -149,7 +167,16 @@ mod tests {
 
     #[test]
     fn test_calculate_word_weights() {
-        let simhash = SimHash::new();
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+
+        let simhash = SimHash::new(0, stopwords);
+
         let text = "This is a test sentence with a few words.";
         let word_counts = simhash.calculate_word_weights(text);
 
@@ -165,7 +192,16 @@ mod tests {
     
     #[test]
     fn test_calculate_from_text() {
-        let mut simhash = SimHash::new();
+
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash = SimHash::new(0, stopwords);
+
         let text = "This is a test sentence.";
 
         let fingerprint = simhash.calculate_from_text(text);
@@ -179,8 +215,18 @@ mod tests {
         let text1 = "test sentence 1";
         let text2 = "test sentence 2";
 
-        let mut simhash1 = SimHash::new();
-        let mut simhash2 = SimHash::new();
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+            // Add more stopwords here
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash1 = SimHash::new(0, stopwords.clone());
+        let mut simhash2 = SimHash::new(0, stopwords.clone());
+
+
 
         simhash1.calculate(text1);
         simhash2.calculate(text2);
