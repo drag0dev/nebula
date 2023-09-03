@@ -1,10 +1,9 @@
 use crate::building_blocks::{
     BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
-    WriteAheadLogReader, SF, BloomFilter,
+    WriteAheadLogReader, SF, BloomFilter, HyperLogLog,
 };
-use crate::repl::{Commands, BloomFilterCommands};
+use crate::repl::{Commands, BloomFilterCommands, HLLCommands};
 use crate::repl::REPL;
-use crate::utils::config::Config;
 use anyhow::{Context, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -50,16 +49,9 @@ impl Engine {
                 let timestamp = entry.timestamp;
                 let key = String::from_utf8(entry.key).context("converting key to String")?;
 
-                let value;
-
                 // Entry path
                 if entry.value.is_some() {
-                    let strval = String::from_utf8(entry.value.unwrap())
-                        .context("converting val to String")?;
-
-                    value = Some(strval);
-
-                    let mementry = MemtableEntry::new_string( entry.timestamp, key.clone(), value);
+                    let mementry = MemtableEntry::new( entry.timestamp, key.clone(), entry.value);
 
                     memtable.create(mementry);
                     continue;
@@ -113,6 +105,7 @@ impl Engine {
                         println!("DELETE: {}", key);
                     }
                     Commands::Bf(cmd) => self.bloomfilter(cmd)?,
+                    Commands::Hll(cmd) => self.hll(cmd)?,
                     Commands::Quit => {
                         println!("quitting...");
                         self.quit().context("quitting")?;
@@ -215,12 +208,7 @@ impl Engine {
             BloomFilterCommands::New { bloom_filter_key } => {
                 let bf = BloomFilter::new(5, 0.01);
                 let bf_ser = bf.serialize()?;
-                let entry = MemtableEntry::new(get_timestamp()?, bloom_filter_key, Some(bf_ser));
-                if let Some(res) = self.memtable.create(entry) {
-                    if res.is_ok() {
-                        self.handle_memtable_flush()?;
-                    }
-                }
+                self.put(bloom_filter_key, Some(bf_ser))?;
             },
             BloomFilterCommands::Check { bloom_filter_key, value } => {
                 let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
@@ -239,6 +227,41 @@ impl Engine {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn hll(&mut self, cmd: HLLCommands) -> Result<()> {
+        match cmd {
+            HLLCommands::New { hll_key } => {
+                let hll = HyperLogLog::new(8);
+                let hll_ser = hll.serialize()?;
+                self.put(hll_key, Some(hll_ser))?;
+            }
+            HLLCommands::Add { hll_key, value } => {
+                let hll = self.get(hll_key.clone().into_bytes())?;
+                if let Some(hll) = hll {
+                    if let Some(hll_ser) = hll.value {
+                        let mut hll = HyperLogLog::deserialize(&hll_ser[..])?;
+                        hll.add(value.as_bytes());
+                        let hll_ser = hll.serialize()?;
+                        self.put(hll_key, Some(hll_ser))?;
+                    } else {
+                        println!("Entry not found");
+                    }
+                }
+            },
+            HLLCommands::Count { hll_key } => {
+                let hll = self.get(hll_key.clone().into_bytes())?;
+                if let Some(hll) = hll {
+                    if let Some(hll_ser) = hll.value {
+                        let hll = HyperLogLog::deserialize(&hll_ser[..])?;
+                        println!("Count: {}", hll.count());
+                    } else {
+                        println!("Entry not found");
+                    }
+                }
+            },
         }
         Ok(())
     }
