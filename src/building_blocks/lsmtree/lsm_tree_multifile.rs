@@ -5,7 +5,7 @@ use crate::building_blocks::sstable::{
 use crate::building_blocks::Entry;
 use std::fs::{remove_dir_all, rename};
 use std::rc::Rc;
-use super::{LSMTree, TableNode, Level};
+use super::{LSMTree, TableNode, Level, LSMTreeInterface};
 
 impl LSMTree<MF> {
     pub fn new(
@@ -32,104 +32,6 @@ impl LSMTree<MF> {
         }
     }
 
-    // NOTE:?
-    // Can't use ? if func returns Option<T>
-    /// Tries to find an `Entry` base on the `key`
-    ///
-    /// Returns None if it encounters a tombstone
-    /// Returns None if it finds nothing even after a full traversal
-    /// # Examples:
-    /// ```
-    /// let dir = String::from("data");
-    ///
-    /// let mut lsm = LSMTree::new(
-    ///     0.1, // fp_prob: f64,
-    ///     10,  // summary_nth: u64,
-    ///     dir, // data_dir: String,
-    ///     3    // size_threshold: usize,
-    ///     3    // number_of_levels: usize,
-    /// );
-    /// lsm.insert("new_sstable").unwrap();
-    ///
-    /// let key: Vec<u8> = Vec::from("joe");
-    /// let out = lsm.get(key);
-    /// assert!(out.is_some());
-    ///
-    /// let key: Vec<u8> = Vec::from("mama");
-    /// let out = lsm.get(key);
-    /// assert!(out.is_some());
-    ///
-    /// ```
-    pub fn get(&self, key: Vec<u8>) -> Option<Entry> {
-        for level in &self.levels {
-            for table in &level.nodes.iter().rev().collect::<Vec<&TableNode>>() {
-                let path = format!("{}/{}", self.data_dir, table.path);
-                let msg = format!("Failed to open file {path}");
-                let reader = SSTableReader::load(&path).context(msg).unwrap();
-                let filter = &reader.filter;
-
-                let mut sum_offset: Option<u64> = None;
-
-                // if filter says no just go on
-                if !filter.check(&key).unwrap() {
-                    continue;
-                }
-
-                let mut index = reader.index_iter().unwrap();
-                let (sum_iter, sum_range) = reader.summary_iter().unwrap();
-
-                if sum_range.first_key > key {
-                    continue;
-                }
-                if sum_range.last_key < key {
-                    continue;
-                }
-
-                for e in sum_iter {
-                    let sum_entry = e.unwrap();
-
-                    if sum_entry.first_key <= key {
-                        if sum_entry.last_key >= key {
-                            sum_offset = Some(sum_entry.offset);
-                            break;
-                        }
-                    }
-                }
-
-                if sum_offset.is_none() {
-                    return None;
-                }
-
-                let entries = reader.iter();
-                assert!(entries.is_ok());
-                let mut entries = entries.unwrap();
-
-                assert!(sum_offset.is_some());
-                let offset = sum_offset.unwrap();
-                index.move_iter(offset).unwrap();
-                for entry in index {
-                    let entry = entry.unwrap();
-                    let offset = entry.offset;
-                    if entry.key != key {
-                        continue;
-                    }
-
-                    entries.move_iter(offset).unwrap();
-                    let entry_ok = entries.next().unwrap().unwrap();
-
-                    // if it's a tombstone, assume byebye
-                    if entry_ok.value.is_none() {
-                        return None;
-                    }
-
-                    return Some(entry_ok);
-                }
-                return None;
-            }
-        }
-        None
-    }
-
     /// Private function for appending the table names to each level
     pub(super) fn append_table(&mut self, path: &str) -> Result<()> {
         let node = TableNode {
@@ -149,56 +51,6 @@ impl LSMTree<MF> {
             self.merge(0, &dir).context("merging")?;
         }
         Ok(())
-    }
-
-    /// Inserts a new sstable into the LSM structure by passing a filepath
-    ///
-    /// # NOTE:
-    /// `path` is relative to the `data_dir` field of the instantiated LSMTree
-    /// Will probably die if the `path` is incorrect
-    ///
-    /// # NOTE:
-    /// Do _not_ pass `path` = "sstable-n-n" as it _will_ die
-    /// Pass anything else
-    ///
-    /// # Examples:
-    /// ```
-    /// let dir = String::from("data");
-    ///
-    /// let mut lsm = LSMTree::new(
-    ///     0.1, // fp_prob: f64,
-    ///     10,  // summary_nth: u64,
-    ///     dir, // data_dir: String,
-    ///     3    // size_threshold: usize,
-    ///     3    // number_of_levels: usize,
-    /// );
-    /// lsm.insert("new_sstable").unwrap();
-    ///
-    /// let key: Vec<u8> = Vec::from("joe");
-    /// let out = lsm.get(key);
-    /// assert!(out.is_some());
-    ///
-    /// let key: Vec<u8> = Vec::from("mama");
-    /// let out = lsm.get(key);
-    /// assert!(out.is_some());
-    ///
-    /// ```
-    pub fn insert(&mut self, table_name: &str) -> Result<()> {
-        let path = format!("{}/{}", self.data_dir, table_name);
-
-        let new_idx = self.last_table + 1;
-
-        let new_name = format!("sstable-0-{}", new_idx);
-        let new_path = format!("{}/{}", self.data_dir, new_name);
-        // create_dir(&new_path).context("creating empty dir").unwrap();
-
-        rename(path, new_path).context("renaming sstable")?;
-
-        println!("okRENAMED {table_name}");
-
-        self.last_table += 1;
-
-        self._insert(&new_name)
     }
 
     /// Function to resolve a sequence of entries with the same key
@@ -359,7 +211,158 @@ impl LSMTree<MF> {
         Ok(())
     }
 
-    pub fn load(&mut self) -> Result<()> {
+}
+
+impl LSMTreeInterface for LSMTree<MF> {
+    /// Inserts a new sstable into the LSM structure by passing a filepath
+    ///
+    /// # NOTE:
+    /// `path` is relative to the `data_dir` field of the instantiated LSMTree
+    /// Will probably die if the `path` is incorrect
+    ///
+    /// # NOTE:
+    /// Do _not_ pass `path` = "sstable-n-n" as it _will_ die
+    /// Pass anything else
+    ///
+    /// # Examples:
+    /// ```
+    /// let dir = String::from("data");
+    ///
+    /// let mut lsm = LSMTree::new(
+    ///     0.1, // fp_prob: f64,
+    ///     10,  // summary_nth: u64,
+    ///     dir, // data_dir: String,
+    ///     3    // size_threshold: usize,
+    ///     3    // number_of_levels: usize,
+    /// );
+    /// lsm.insert("new_sstable").unwrap();
+    ///
+    /// let key: Vec<u8> = Vec::from("joe");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// let key: Vec<u8> = Vec::from("mama");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// ```
+    fn insert(&mut self, table_name: &str) -> Result<()> {
+        let path = format!("{}/{}", self.data_dir, table_name);
+
+        let new_idx = self.last_table + 1;
+
+        let new_name = format!("sstable-0-{}", new_idx);
+        let new_path = format!("{}/{}", self.data_dir, new_name);
+        // create_dir(&new_path).context("creating empty dir").unwrap();
+
+        rename(path, new_path).context("renaming sstable")?;
+
+        println!("okRENAMED {table_name}");
+
+        self.last_table += 1;
+
+        self._insert(&new_name)
+    }
+
+    // NOTE:?
+    // Can't use ? if func returns Option<T>
+    /// Tries to find an `Entry` base on the `key`
+    ///
+    /// Returns None if it encounters a tombstone
+    /// Returns None if it finds nothing even after a full traversal
+    /// # Examples:
+    /// ```
+    /// let dir = String::from("data");
+    ///
+    /// let mut lsm = LSMTree::new(
+    ///     0.1, // fp_prob: f64,
+    ///     10,  // summary_nth: u64,
+    ///     dir, // data_dir: String,
+    ///     3    // size_threshold: usize,
+    ///     3    // number_of_levels: usize,
+    /// );
+    /// lsm.insert("new_sstable").unwrap();
+    ///
+    /// let key: Vec<u8> = Vec::from("joe");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// let key: Vec<u8> = Vec::from("mama");
+    /// let out = lsm.get(key);
+    /// assert!(out.is_some());
+    ///
+    /// ```
+    fn get(&self, key: Vec<u8>) -> Option<Entry> {
+        for level in &self.levels {
+            for table in &level.nodes.iter().rev().collect::<Vec<&TableNode>>() {
+                let path = format!("{}/{}", self.data_dir, table.path);
+                let msg = format!("Failed to open file {path}");
+                let reader = SSTableReader::load(&path).context(msg).unwrap();
+                let filter = &reader.filter;
+
+                let mut sum_offset: Option<u64> = None;
+
+                // if filter says no just go on
+                if !filter.check(&key).unwrap() {
+                    continue;
+                }
+
+                let mut index = reader.index_iter().unwrap();
+                let (sum_iter, sum_range) = reader.summary_iter().unwrap();
+
+                if sum_range.first_key > key {
+                    continue;
+                }
+                if sum_range.last_key < key {
+                    continue;
+                }
+
+                for e in sum_iter {
+                    let sum_entry = e.unwrap();
+
+                    if sum_entry.first_key <= key {
+                        if sum_entry.last_key >= key {
+                            sum_offset = Some(sum_entry.offset);
+                            break;
+                        }
+                    }
+                }
+
+                if sum_offset.is_none() {
+                    return None;
+                }
+
+                let entries = reader.iter();
+                assert!(entries.is_ok());
+                let mut entries = entries.unwrap();
+
+                assert!(sum_offset.is_some());
+                let offset = sum_offset.unwrap();
+                index.move_iter(offset).unwrap();
+                for entry in index {
+                    let entry = entry.unwrap();
+                    let offset = entry.offset;
+                    if entry.key != key {
+                        continue;
+                    }
+
+                    entries.move_iter(offset).unwrap();
+                    let entry_ok = entries.next().unwrap().unwrap();
+
+                    // if it's a tombstone, assume byebye
+                    if entry_ok.value.is_none() {
+                        return None;
+                    }
+
+                    return Some(entry_ok);
+                }
+                return None;
+            }
+        }
+        None
+    }
+
+    fn load(&mut self) -> Result<()> {
         let paths =
             std::fs::read_dir(self.data_dir.clone()).context("reading directory contents")?;
 

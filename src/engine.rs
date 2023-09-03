@@ -1,5 +1,7 @@
 use crate::building_blocks::{
-    BTree, Cache, Entry, LSMTree, Memtable, MemtableEntry, WriteAheadLog, SF,
+    BTree, Cache, Entry, LSMTree,
+    Memtable, MemtableEntry, WriteAheadLog,
+    SF, LSMTreeInterface,
 };
 use crate::repl::Commands;
 use crate::repl::REPL;
@@ -9,18 +11,19 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Engine {
-    memtable: Memtable<BTree<String, Rc<RefCell<MemtableEntry>>>>,
+    memtable: Memtable,
     cache: Cache,
     wal: WriteAheadLog,
-    lsm: LSMTree<SF>,
+    lsm: Box<dyn LSMTreeInterface>,
 }
 
+
 impl Engine {
-    pub fn new() -> Result<Engine> {
+    pub fn new() -> Result<Self> {
         let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
 
         let memtable = Memtable::new(
-            b_tree,
+            Box::new(b_tree),
             2,
             crate::building_blocks::FileOrganization::SingleFile(()),
             0.1,
@@ -39,7 +42,7 @@ impl Engine {
             memtable,
             cache,
             wal,
-            lsm,
+            lsm: Box::new(lsm),
         })
     }
 
@@ -108,6 +111,7 @@ impl Engine {
 
         let result: Option<Entry> = self.lsm.get(key);
         if let Some(entry) = result {
+            self.cache.add(&entry.key, entry.value.clone().as_deref());
             println!("ENTRY: {:?}", entry);
         } else {
             println!("KEY NOT FOUND");
@@ -136,7 +140,16 @@ impl Engine {
 
     fn delete(&mut self, key: String) -> Result<()> {
         let entry = MemtableEntry::new(get_timestamp()?, key, None);
-        self.memtable.delete(entry);
+        let walentry = Entry::from(&entry);
+        self.wal.add(&walentry).context("adding to WAL")?;
+        if let Some(result) = self.memtable.delete(entry) {
+            if let Ok(_) = result {
+                println!("OK DELETE");
+                return self.handle_memtable_flush();
+            } else {
+                return result;
+            }
+        }
         Ok(())
     }
 

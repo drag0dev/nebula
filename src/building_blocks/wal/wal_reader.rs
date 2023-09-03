@@ -20,13 +20,14 @@ impl WriteAheadLogReader {
 
         let mut file_names = get_valid_path_names(paths)?;
         _ = get_next_index_avaiable(&file_names)
-            .context("check if ther are files missing")?;
+            .context("check if there are files missing")?;
 
         file_names.sort_unstable_by(|a, b| {
             let a_index = a.split('-').last().unwrap().parse::<u64>().unwrap();
             let b_index = b.split('-').last().unwrap().parse::<u64>().unwrap();
             a_index.partial_cmp(&b_index).unwrap()
         });
+        file_names.reverse();
 
         Ok(WriteAheadLogReader {
             files: file_names,

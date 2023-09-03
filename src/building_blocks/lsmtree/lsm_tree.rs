@@ -1,4 +1,5 @@
-use crate::building_blocks::sstable::LSMTreeUnderlying;
+use anyhow::Result;
+use crate::building_blocks::{sstable::LSMTreeUnderlying, Entry};
 
 #[derive(Debug)]
 pub struct TableNode {
@@ -23,4 +24,10 @@ pub struct LSMTree<S: LSMTreeUnderlying> {
     pub(super) size_threshold: usize,
     pub(super) last_table: usize,
     pub(super) marker: std::marker::PhantomData<S>,
+}
+
+pub trait LSMTreeInterface {
+    fn get(&self, key: Vec<u8>) -> Option<Entry>;
+    fn insert(&mut self, table_name: &str) -> Result<()>;
+    fn load(&mut self) -> Result<()>;
 }
