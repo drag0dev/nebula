@@ -1,5 +1,7 @@
 use crate::building_blocks::{
-    BTree, Cache, Entry, LSMTree, Memtable, MemtableEntry, WriteAheadLog, SF,
+    BTree, Cache, Entry, LSMTree,
+    Memtable, MemtableEntry, WriteAheadLog,
+    SF, LSMTreeInterface,
 };
 use crate::repl::Commands;
 use crate::repl::REPL;
@@ -9,18 +11,19 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Engine {
-    memtable: Memtable<BTree<String, Rc<RefCell<MemtableEntry>>>>,
+    memtable: Memtable,
     cache: Cache,
     wal: WriteAheadLog,
-    lsm: LSMTree<SF>,
+    lsm: Box<dyn LSMTreeInterface>,
 }
 
+
 impl Engine {
-    pub fn new() -> Result<Engine> {
+    pub fn new() -> Result<Self> {
         let b_tree: BTree<String, Rc<RefCell<MemtableEntry>>> = BTree::new();
 
         let memtable = Memtable::new(
-            b_tree,
+            Box::new(b_tree),
             2,
             crate::building_blocks::FileOrganization::SingleFile(()),
             0.1,
@@ -39,7 +42,7 @@ impl Engine {
             memtable,
             cache,
             wal,
-            lsm,
+            lsm: Box::new(lsm),
         })
     }
 

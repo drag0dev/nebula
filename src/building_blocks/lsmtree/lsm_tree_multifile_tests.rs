@@ -7,7 +7,7 @@ use crate::building_blocks::{
     SSTableBuilderMultiFile as SSTableBuilder,
     Entry
 };
-use super::LSMTree;
+use super::{LSMTree, LSMTreeInterface};
 
 fn insert_range(
     range: &mut Range<i32>,
@@ -17,7 +17,7 @@ fn insert_range(
     auto_merge: bool,
     base: &str,
 ) -> Result<(), ()> {
-    // must sort entries 
+    // must sort entries
     let mut entries: Vec<String> = range.map(|i| i.to_string()).collect();
     entries.sort();
 
@@ -533,7 +533,7 @@ fn lsm_load_multi() -> Result<()> {
             )
         })
         .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
-    
+
         println!("CLEARIND");
     lsm.levels.clear();
         println!("CLEARED");
