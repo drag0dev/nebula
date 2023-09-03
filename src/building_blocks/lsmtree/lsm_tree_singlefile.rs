@@ -1,12 +1,12 @@
 // TODO: replace the unwraps with context()? if I have the time
-use anyhow::{Context, Result};
+use super::{LSMTree, LSMTreeInterface, Level, TableNode};
 use crate::building_blocks::sstable::{
-    SSTableReaderSingleFile as SSTableReader,
-    SSTableBuilderSingleFile as SSTableBuilder, SF};
+    SSTableBuilderSingleFile as SSTableBuilder, SSTableReaderSingleFile as SSTableReader, SF,
+};
 use crate::building_blocks::Entry;
-use std::fs::{remove_dir_all, rename};
+use anyhow::{Context, Result};
+use std::fs::{read_dir, remove_dir_all, rename};
 use std::rc::Rc;
-use super::{LSMTree, TableNode, Level, LSMTreeInterface};
 
 impl LSMTree<SF> {
     pub fn new(
@@ -16,7 +16,6 @@ impl LSMTree<SF> {
         size_threshold: usize,
         number_of_levels: usize,
     ) -> Self {
-
         let marker: std::marker::PhantomData<SF> = Default::default();
         let mut levels = vec![];
         for _ in 0..number_of_levels {
@@ -89,6 +88,102 @@ impl LSMTree<SF> {
 
     /// Merges all sstables assigned to a specified level into
     /// an sstable specified by filename
+    pub(super) fn merge_entries(&mut self) -> Result<Vec<Entry>> {
+        let mut out_entries: Vec<Entry> = vec![];
+
+        // read all files in data dir
+        let files = read_dir(self.data_dir).context("reading data dir")?;
+
+        // get filenames and create a vec of table iterators from each file
+        let mut iterators: Vec<_> = files
+            .into_iter()
+            .map(|file| {
+                let filepath = file.context("unwrapping file").unwrap();
+                let filepath = filepath.path();
+                let filepath = filepath.display();
+                let filepath = &(format!("{}/{}", self.data_dir, filepath));
+
+                SSTableReader::load(filepath)
+                    .with_context(|| format!("loading {}", filepath))
+                    .unwrap()
+
+
+                    ///////////////// TODO replace this with some iter that returns the prefix shit or whatever
+                    .iter()
+
+
+                    .unwrap()
+                    .into_iter()
+                    .peekable()
+            })
+            .collect();
+
+        let mut last_key: Option<Vec<u8>> = None;
+        let mut relevant_entries: Vec<Rc<Entry>> = Vec::new();
+
+        loop {
+            // Get the smallest entry
+            let smallest = iterators
+                .iter_mut()
+                .enumerate()
+                .filter_map(|(idx, iter)| iter.peek().map(|value| (value, idx)))
+                .min_by_key(|&(value, _)| value.as_ref().unwrap().key.clone());
+
+            match smallest {
+                Some((_, idx)) => {
+                    // Consume the value from the corresponding iterator
+                    let entry = iterators[idx].next().unwrap().unwrap();
+                    let key = { entry.key.clone() };
+
+                    let entry_ref = Rc::new(entry);
+
+                    // Check if this entry has the same key as the last key
+                    if last_key.as_ref() == Some(&key) {
+                        relevant_entries.push(Rc::clone(&entry_ref));
+                    } else {
+                        relevant_entries.sort_by_key(|e| e.timestamp);
+
+                        // traverse the entries backwards
+                        // and get the newest non-tombstone entry
+                        for entry in relevant_entries.iter().rev() {
+                            if entry.value.is_none() {
+                                continue;
+                            }
+
+                            // unpack the entry
+                            out_entries.push((**entry).clone());
+                        }
+
+                        relevant_entries.clear();
+
+                        relevant_entries.push(Rc::clone(&entry_ref));
+                        last_key = Some(key);
+                    }
+                }
+                None => {
+                    // If there are no more entries, resolve the remaining entries
+                    //
+                    // traverse the entries backwards
+                    // and get the newest non-tombstone entry
+                    for entry in relevant_entries.iter().rev() {
+                        if entry.value.is_none() {
+                            continue;
+                        }
+
+                        out_entries.push((**entry).clone());
+                    }
+
+                    relevant_entries.clear();
+                    break; // Break when all iterators are exhausted
+                }
+            }
+        }
+
+        Ok(out_entries)
+    }
+
+    /// Merges all sstables assigned to a specified level into
+    /// an sstable specified by filename
     pub(super) fn merge(&mut self, level_num: usize, dirname: &str) -> Result<()> {
         if level_num == self.levels.len() - 1 {
             return Ok(());
@@ -101,7 +196,6 @@ impl LSMTree<SF> {
                 last = num.parse().context("parsing last")?;
             }
         }
-
 
         let tablename = &format!("sstable-{}-{}", level_num + 1, last + 1);
 
@@ -137,8 +231,6 @@ impl LSMTree<SF> {
             self.summary_nth,
         )
         .context("creating builder")?;
-
-
 
         let mut last_key: Option<Vec<u8>> = None;
         let mut relevant_entries: Vec<Rc<Entry>> = Vec::new();
