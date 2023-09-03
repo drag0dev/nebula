@@ -7,7 +7,7 @@ use crate::building_blocks::{
     SSTableBuilderSingleFile as SSTableBuilder,
     Entry
 };
-use super::LSMTree;
+use super::{LSMTree, LSMTreeInterface};
 
 macro_rules! redo_dirs {
     ($expr:expr) => {
@@ -516,7 +516,7 @@ fn lsm_load_single() -> Result<()> {
             )
         })
         .for_each(|p| println!("STATUS {} {:?}", p.0, p.1));
-    
+
         println!("CLEARIND");
     lsm.levels.clear();
         println!("CLEARED");

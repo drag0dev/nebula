@@ -20,16 +20,6 @@ pub struct Entry {
 
 impl From<&MemtableEntry> for Entry {
     fn from(memtable_entry: &MemtableEntry) -> Self {
-        let value = if let Some(value) = memtable_entry.value.as_ref() {
-            let value_vec = value
-                .chars()
-                .map(|c| c as u8)
-                .collect::<Vec<u8>>();
-            Some(value_vec)
-        } else {
-            None
-        };
-
         let key = memtable_entry.key
             .chars()
             .map(|c| c as u8)
@@ -38,7 +28,7 @@ impl From<&MemtableEntry> for Entry {
         Entry {
             timestamp: memtable_entry.timestamp,
             key,
-            value
+            value: memtable_entry.value.clone()
         }
     }
 }

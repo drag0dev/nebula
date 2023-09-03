@@ -9,11 +9,9 @@ use super::{
 /// is greater or equal to capacity, in order to avoid checking multiple times for one action
 /// create, update and delete return the path to the new sstable if flush happened
 /// sstable created when flushing memtable is always called "memtable"
-pub struct Memtable <S>
-where
-    S: StorageCRUD
+pub struct Memtable
 {
-    storage: S,
+    storage: Box<dyn StorageCRUD>,
 
     /// number of entries in the memtable
     pub len: u64,
@@ -27,11 +25,9 @@ where
     data_folder: String,
 }
 
-impl<S> Memtable<S>
-where
-    S: StorageCRUD
+impl Memtable
 {
-    pub fn new(storage: S, capacity: u64, sstable_type: FileOrganization, fp_prob: f64, summary_nth: u64, data_folder: String) -> Self {
+    pub fn new(storage: Box<dyn StorageCRUD>, capacity: u64, sstable_type: FileOrganization, fp_prob: f64, summary_nth: u64, data_folder: String) -> Self {
         Memtable{
             storage,
             len: 0,
@@ -112,7 +108,7 @@ where
         res
     }
 
-    fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         let wrapped_entries = self.storage.entries();
         let ref_entries = wrapped_entries
             .iter()

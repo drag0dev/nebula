@@ -48,7 +48,7 @@ fn main() {
             } else {
                 println!("successfully generated test data");
             }
-        }
+        },
         CliCommands::DummyData { file_name } => todo!(),
     }
 }

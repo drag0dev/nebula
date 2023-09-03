@@ -1,24 +1,20 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use bincode::Options;
+use anyhow::{Result, Context};
+use serde::{Serialize, Deserialize};
+use super::BINCODE_OPTIONS;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SimHash {
     simhash: u64,
     stopwords: HashSet<String>,
 }
 
 impl SimHash {
-    pub fn new() -> Self {
-        let stopwords: HashSet<String> = [
-            "this", "is", "a", "with", "to", "the", "some",
-            // Add more stopwords here
-        ]
-        .iter()
-        .map(|&word| word.to_string())
-        .collect();
-
+    pub fn new(simhash: u64, stopwords: HashSet<String>) -> Self {
         SimHash {
-            simhash: 0,
+            simhash,
             stopwords,
         }
     }
@@ -51,7 +47,7 @@ impl SimHash {
             let hash_chars: Vec<char> = hash.chars().collect();
             self.update_weighted_bits(&mut weighted_bits, &hash_chars, *count);
         }
-        
+
         self.calculate_fingerprint(&mut weighted_bits);
     }
 
@@ -59,7 +55,7 @@ impl SimHash {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         s.hash(&mut hasher);
         // Formats the hash as a binary string with leading zeros
-        format!("{:064b}", hasher.finish()) 
+        format!("{:064b}", hasher.finish())
     }
 
     pub fn update_weighted_bits(&mut self, weighted_bits: &mut Vec<i32>, hash_chars: &[char], count: i32) {
@@ -82,7 +78,7 @@ impl SimHash {
         }
     }
 
-    pub fn calculate_from_text(&mut self, text: &str) -> u64 { 
+    pub fn calculate_from_text(&mut self, text: &str) -> u64 {
         self.calculate(text);
         self.fingerprint()
     }
@@ -91,6 +87,17 @@ impl SimHash {
         self.simhash
     }
 
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(BINCODE_OPTIONS
+            .serialize(self)
+            .context("serializing simahsh")?)
+    }
+
+    pub fn deserialize(input: &[u8]) -> Result<Self> {
+        Ok(BINCODE_OPTIONS
+            .deserialize(input)
+            .context("deserializing simhash")?)
+    }
 }
 
 pub fn hamming_distance(a: u64, b: u64) -> u32 {
@@ -100,7 +107,7 @@ pub fn hamming_distance(a: u64, b: u64) -> u32 {
 // Calculate similarity based on the Hamming distance
 pub fn similarity(hash1: u64, hash2: u64) -> f64 {
     let distance: f64 = hamming_distance(hash1, hash2) as f64;
-    1.0 - (distance / 64.0)  
+    1.0 - (distance / 64.0)
 }
 
 #[cfg(test)]
@@ -116,7 +123,15 @@ mod tests {
 
     #[test]
     fn test_update_weighted_bits() {
-        let mut simhash = SimHash::new();
+        let stopwords = vec![
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash = SimHash::new(0, stopwords);
+
         let mut weighted_bits = vec![0; 64];
 
         // Hash a test word
@@ -133,7 +148,16 @@ mod tests {
 
     #[test]
     fn test_calculate_fingerprint() {
-        let mut simhash = SimHash::new();
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash = SimHash::new(0, stopwords);
+
+
         let mut weighted_bits = vec![0; 64];
         weighted_bits[2] = 3;
         simhash.calculate_fingerprint(&mut weighted_bits);
@@ -143,6 +167,7 @@ mod tests {
 
     #[test]
     fn test_similarity() {
+
         let hash1: u64 = 0b1101101;
         let hash2: u64 = 0b1101110;
         let similarity = similarity(hash1, hash2);
@@ -157,7 +182,16 @@ mod tests {
 
     #[test]
     fn test_calculate_word_weights() {
-        let simhash = SimHash::new();
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+
+        let simhash = SimHash::new(0, stopwords);
+
         let text = "This is a test sentence with a few words.";
         let word_counts = simhash.calculate_word_weights(text);
 
@@ -170,10 +204,19 @@ mod tests {
         assert_eq!(word_counts.get("is"), None);   // Stopword
         assert_eq!(word_counts.get("a"), None);    // Stopword
     }
-    
+
     #[test]
     fn test_calculate_from_text() {
-        let mut simhash = SimHash::new();
+
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash = SimHash::new(0, stopwords);
+
         let text = "This is a test sentence.";
 
         let fingerprint = simhash.calculate_from_text(text);
@@ -187,8 +230,18 @@ mod tests {
         let text1 = "test sentence 1";
         let text2 = "test sentence 2";
 
-        let mut simhash1 = SimHash::new();
-        let mut simhash2 = SimHash::new();
+        let stopwords: HashSet<String> = [
+            "this", "is", "a", "with", "to", "the", "some",
+            // Add more stopwords here
+        ]
+        .iter()
+        .map(|&word| word.to_string())
+        .collect();
+
+        let mut simhash1 = SimHash::new(0, stopwords.clone());
+        let mut simhash2 = SimHash::new(0, stopwords.clone());
+
+
 
         simhash1.calculate(text1);
         simhash2.calculate(text2);

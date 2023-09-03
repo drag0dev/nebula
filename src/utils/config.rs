@@ -3,6 +3,7 @@ use crate::building_blocks::{
     SkipListNode, TokenBucket, MF, SF,
 };
 use core::cell::RefCell;
+use crate::building_blocks::StorageCRUD;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -22,6 +23,9 @@ pub struct Config {
     pub ssconfig: SSTableConfig,
     pub skiplist: SkipListConfig,
     pub simhash: SimHashConfig,
+    pub memtable: MemtableConfig,
+    pub wal: WALConfig,
+    pub cache: CacheConfig,
 }
 
 impl Config {
@@ -35,6 +39,9 @@ impl Config {
             ssconfig: SSTableConfig::default(),
             skiplist: SkipListConfig::default(),
             simhash: SimHashConfig::default(),
+            memtable: MemtableConfig::default(),
+            wal: WALConfig::default(),
+            cache: CacheConfig::default(),
         }
     }
 
@@ -88,7 +95,7 @@ impl TokenBucketConfig {
             reset_interval: Duration::from_secs(2),
         }
     }
-    pub fn defaults(&self) -> (usize, Duration) {
+    pub fn get_values(&self) -> (usize, Duration) {
         (self.capacity, self.reset_interval)
     }
 }
@@ -106,7 +113,7 @@ impl CountMinSketchConfig {
             certainty: 0.01,
         }
     }
-    pub fn defaults(&self) -> (f64, f64) {
+    pub fn get_values(&self) -> (f64, f64) {
         (self.desired_accuracy, self.certainty)
     }
 }
@@ -125,13 +132,14 @@ impl BloomFilterConfig {
         }
     }
 
-    pub fn defaults(&self) -> (u64, f64) {
+    pub fn get_values(&self) -> (u64, f64) {
         (self.item_count, self.fp_prob)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LSMTreeConfig {
+    file_organization: FileOrganization,
     fp_prob: f64,
     summary_nth: u64,
     data_dir: String,
@@ -142,6 +150,7 @@ pub struct LSMTreeConfig {
 impl LSMTreeConfig {
     pub fn default() -> Self {
         LSMTreeConfig {
+            file_organization: FileOrganization::MultiFile(()),
             fp_prob: 0.01,
             summary_nth: 50,
             data_dir: String::from("data/table_data"),
@@ -150,8 +159,9 @@ impl LSMTreeConfig {
         }
     }
 
-    pub fn defaults(&self) -> (f64, u64, String, usize, usize) {
+    pub fn get_values(&self) -> (FileOrganization, f64, u64, String, usize, usize) {
         (
+            self.file_organization.clone(),
             self.fp_prob,
             self.summary_nth,
             self.data_dir.clone(),
@@ -169,7 +179,7 @@ impl SSTableConfig {
             summary_nth: 50,
         }
     }
-    pub fn defaults(&self) -> (FileOrganization, f64, u64) {
+    pub fn get_values(&self) -> (FileOrganization, f64, u64) {
         (
             self.file_organization.clone(),
             self.filter_fp_prob,
@@ -188,8 +198,47 @@ impl HLLConfig {
         HLLConfig { number_of_bits: 10 }
     }
 
-    pub fn defaults(&self) -> u8 {
+    pub fn get_values(&self) -> u8 {
         self.number_of_bits
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum MemtableStorage {
+    BTree,
+    SkipList
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MemtableConfig {
+    storage: MemtableStorage,
+    capacity: u64,
+    sstable_type: FileOrganization,
+    fp_prob: f64,
+    summary_nth: u64,
+    data_folder: String,
+}
+
+impl MemtableConfig {
+    pub fn default() -> Self {
+        MemtableConfig {
+            storage: MemtableStorage::BTree,
+            capacity: 50,
+            sstable_type: FileOrganization::MultiFile(()),
+            fp_prob: 0.01,
+            summary_nth: 50,
+            data_folder: String::from("data/table_data"),
+        }
+    }
+    pub fn get_values(&self) -> (MemtableStorage, u64, FileOrganization, f64, u64, String) {
+        (
+            self.storage.clone(),
+            self.capacity,
+            self.sstable_type.clone(),
+            self.fp_prob,
+            self.summary_nth,
+            self.data_folder.clone(),
+        )
     }
 }
 
@@ -212,7 +261,7 @@ impl SimHashConfig {
         }
     }
 
-    pub fn defaults(&self) -> (u64, HashSet<String>) {
+    pub fn get_values(&self) -> (u64, HashSet<String>) {
         (self.simhash, self.stopwords.clone())
     }
 }
@@ -227,8 +276,37 @@ impl SkipListConfig {
         SkipListConfig { max_level: 10 }
     }
 
-    pub fn defaults(&self) -> usize {
+    pub fn get_values(&self) -> usize {
         self.max_level
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WALConfig {
+    segment_size: u64,
+    path: String
+}
+
+impl WALConfig {
+    pub fn default() -> Self {
+        WALConfig { segment_size: 20000, path: String::from("data/WAL") }
+    }
+    pub fn get_values(&self) -> (String, u64) {
+        (self.path.clone(), self.segment_size)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CacheConfig {
+    capacity: u64,
+}
+
+impl CacheConfig {
+    pub fn default() -> Self {
+        CacheConfig { capacity: 1000 }
+    }
+    pub fn get_values(&self) -> u64 {
+        self.capacity
     }
 }
 
