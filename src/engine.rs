@@ -1,15 +1,16 @@
 use crate::building_blocks::{
     BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
-    WriteAheadLogReader, SF,
+    WriteAheadLogReader, SF, BloomFilter,
 };
-use crate::repl::Commands;
+use crate::repl::{Commands, BloomFilterCommands};
 use crate::repl::REPL;
+use crate::utils::config::Config;
 use anyhow::{Context, Result};
 use std::cell::RefCell;
-use std::mem;
-use std::process::exit;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+// TODO: add config as a field to the engine
 
 pub struct Engine {
     memtable: Memtable,
@@ -58,11 +59,7 @@ impl Engine {
 
                     value = Some(strval);
 
-                    let mementry = MemtableEntry {
-                        timestamp: entry.timestamp,
-                        key: key.clone(),
-                        value,
-                    };
+                    let mementry = MemtableEntry::new_string( entry.timestamp, key.clone(), value);
 
                     memtable.create(mementry);
                     continue;
@@ -108,13 +105,14 @@ impl Engine {
                     }
                     Commands::Put { key, value } => {
                         println!("PUT: {} {}", key, value);
-                        self.put(key, Some(value))
+                        self.put(key, Some(value.as_bytes().to_vec()))
                             .context("putting {key} {value}")?;
                     }
                     Commands::Delete { key } => {
                         self.delete(key.clone()).context("deleting {key}")?;
                         println!("DELETE: {}", key);
                     }
+                    Commands::Bf(cmd) => self.bloomfilter(cmd)?,
                     Commands::Quit => {
                         println!("quitting...");
                         self.quit().context("quitting")?;
@@ -136,31 +134,37 @@ impl Engine {
         self.wal.purge().context("purging wal")
     }
 
-    fn get(&mut self, key: Vec<u8>) -> Result<()> {
+    fn get(&mut self, key: Vec<u8>) -> Result<Option<Entry>> {
         let strkey = String::from_utf8(key.clone()).context("converting key to string")?;
         let result = self.memtable.read(strkey.clone());
         if let Some(mem_entry) = result {
             println!("ENTRY: {:?}", mem_entry);
-            return Ok(());
+            return Ok(Some(Entry::from(&*mem_entry.as_ref().borrow())));
         }
 
         if let Some(entry) = self.cache.find(&key[..]) {
             println!("ENTRY: {:?}", entry);
-            return Ok(());
+            let entry = Entry {
+                timestamp: 0,
+                key,
+                value: entry,
+            };
+            return Ok(Some(entry));
         }
 
         let result: Option<Entry> = self.lsm.get(key);
         if let Some(entry) = result {
             self.cache.add(&entry.key, entry.value.clone().as_deref());
             println!("ENTRY: {:?}", entry);
+            return Ok(Some(entry));
         } else {
             println!("KEY NOT FOUND");
         }
 
-        Ok(())
+        Ok(None)
     }
 
-    fn put(&mut self, key: String, value: Option<String>) -> Result<()> {
+    fn put(&mut self, key: String, value: Option<Vec<u8>>) -> Result<()> {
         let mementry = MemtableEntry::new(get_timestamp()?, key, value);
         let walentry = Entry::from(&mementry);
         self.wal.add(&walentry).context("adding to WAL")?;
@@ -179,7 +183,7 @@ impl Engine {
     }
 
     fn delete(&mut self, key: String) -> Result<()> {
-        let entry = MemtableEntry::new(get_timestamp()?, key, None);
+        let entry = MemtableEntry::new_string(get_timestamp()?, key, None);
         let walentry = Entry::from(&entry);
         self.wal.add(&walentry).context("adding to WAL")?;
         if let Some(result) = self.memtable.delete(entry) {
@@ -188,6 +192,52 @@ impl Engine {
                 return self.handle_memtable_flush();
             } else {
                 return result;
+            }
+        }
+        Ok(())
+    }
+
+    fn bloomfilter(&mut self, cmd: BloomFilterCommands) -> Result<()> {
+        match cmd {
+            BloomFilterCommands::Add { bloom_filter_key, value } => {
+                let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
+                if let Some(bf_ser) = bf_ser {
+                    if let Some(bf_value) = bf_ser.value {
+                        let mut bf = BloomFilter::deserialize(&bf_value[..])?;
+                        bf.add(&value.as_bytes()[..]).context("adding value to the bloomfilter")?;
+                        let bf_ser = bf.serialize()?;
+                        self.put(bloom_filter_key, Some(bf_ser))?;
+                    } else {
+                        println!("Entry not found");
+                    }
+                }
+            },
+            BloomFilterCommands::New { bloom_filter_key } => {
+                let bf = BloomFilter::new(5, 0.01);
+                let bf_ser = bf.serialize()?;
+                let entry = MemtableEntry::new(get_timestamp()?, bloom_filter_key, Some(bf_ser));
+                if let Some(res) = self.memtable.create(entry) {
+                    if res.is_ok() {
+                        self.handle_memtable_flush()?;
+                    }
+                }
+            },
+            BloomFilterCommands::Check { bloom_filter_key, value } => {
+                let bf_ser = self.get(bloom_filter_key.clone().into_bytes())?;
+                if let Some(bf_ser) = bf_ser {
+                    if let Some(bf_value) = bf_ser.value {
+                        let bf = BloomFilter::deserialize(&bf_value[..])?;
+                        let found = bf.check(value.as_bytes())
+                            .context("checkign if the value is present in the bf")?;
+                        if found {
+                            println!("Value is present in the bloomfilter");
+                        } else {
+                            println!("Value is not present in the bloomfilter");
+                        }
+                    } else {
+                        println!("Entry not found");
+                    }
+                }
             }
         }
         Ok(())

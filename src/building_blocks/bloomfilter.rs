@@ -142,7 +142,7 @@ impl BloomFilter{
             .context("serializing bloomfilter")?)
     }
 
-    pub fn deserialize(&self, input: &[u8]) -> Result<Self> {
+    pub fn deserialize(input: &[u8]) -> Result<Self> {
         Ok(BINCODE_OPTIONS
             .deserialize(input)
             .context("deserializing bloomfilter")?)

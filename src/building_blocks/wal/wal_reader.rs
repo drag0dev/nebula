@@ -81,7 +81,7 @@ fn read_entry(file: &mut File) -> Result<Option<Entry>> {
         };
     }
 
-    let len = BINCODE_OPTIONS
+    let len: u64 = BINCODE_OPTIONS
         .deserialize(&len_ser)
         .context("deserializing entry len")?;
 
@@ -89,7 +89,7 @@ fn read_entry(file: &mut File) -> Result<Option<Entry>> {
         return Ok(None);
     }
 
-    let mut entry_ser = vec![0; len];
+    let mut entry_ser = vec![0; (len + 4) as usize];
     file.read_exact(&mut entry_ser[..])
         .context("reading entry")?;
 

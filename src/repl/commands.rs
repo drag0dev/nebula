@@ -1,11 +1,5 @@
 use clap::{Parser, Subcommand};
 
-// special prefixes:
-// BloomFilter - bf_
-// HLL - hll_
-// CMS - cms_
-// when putting a special structure its expected to be in hexadecimal repr that respects global
-// bincode ser/deser options
 #[derive(Debug, Parser)]
 #[command(name = "")]
 pub struct Repl {
@@ -53,8 +47,9 @@ pub enum Commands {
 
 #[derive(Debug, Subcommand)]
 pub enum BloomFilterCommands {
+    New { bloom_filter_key: String },
     Add { bloom_filter_key: String, value: String },
-    Check { key: String },
+    Check { bloom_filter_key: String, value: String },
 }
 
 // doesnt require an instance
@@ -67,12 +62,14 @@ pub enum SimHashCommands {
 
 #[derive(Debug, Subcommand)]
 pub enum HLLCommands {
+    New { hll_key: String },
     Add { hll_key: String, value: String },
     Count { hll_key: String }
 }
 
 #[derive(Debug, Subcommand)]
 pub enum CMSCommands {
+    New { cms_key: String },
     Add { cms_key: String, value: String },
     Count { cms_key: String }
 }
