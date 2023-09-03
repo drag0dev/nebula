@@ -17,6 +17,7 @@ pub struct SkipList<T> {
 
 impl<T: Ord + Default> SkipList<T> {
     pub fn new(max_level: usize) -> Self {
+
         let head = Rc::new(RefCell::new(SkipListNode {
             value: Default::default(),
             next_nodes: vec![None; max_level],
@@ -132,9 +133,9 @@ impl<T: Ord + Default> SkipList<T> {
 
     fn roll(&mut self) -> usize {
         let mut level = 1;
-        let probability = 0.5; 
+        let probability = 0.5;
         let mut rng = rand::thread_rng();
-        
+
         while rng.gen::<f64>() < probability && level < self.max_level {
             level += 1;
         }
@@ -291,7 +292,7 @@ mod tests {
         assert_eq!(skip_list.search(25).map(|node| node.borrow().value), None);
         assert_eq!(skip_list.search(100).map(|node| node.borrow().value), None);
     }
-    
+
     #[test]
         fn get_first_row_nodes_test() {
             let mut skip_list = SkipList::new(10);

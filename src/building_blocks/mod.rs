@@ -66,5 +66,6 @@ pub use simhash::SimHash;
 pub use simhash::similarity;
 pub use simhash::hamming_distance;
 pub use wal::WriteAheadLog;
+pub use wal::WriteAheadLogReader;
 pub use cache::Cache;
-pub use lsmtree::LSMTree;
+pub use lsmtree::{LSMTree, LSMTreeInterface};
