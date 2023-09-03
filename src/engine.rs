@@ -19,6 +19,7 @@ pub struct Engine {
     cache: Cache,
     wal: WriteAheadLog,
     lsm: Box<dyn LSMTreeInterface>,
+    config: Config,
 }
 
 impl Engine {
@@ -74,6 +75,7 @@ impl Engine {
                     cache,
                     wal,
                     lsm: Box::new(lsm),
+                    config,
                 }
             },
             MultiFile(()) => {
@@ -83,14 +85,13 @@ impl Engine {
                     cache,
                     wal,
                     lsm: Box::new(lsm),
+                    config,
                 }
             }
         };
 
         // load data if found
         engine.lsm.load().context("loading data into lsm")?;
-
-
 
         let mut wal_reader =
             WriteAheadLogReader::iter(&wal_vars.0).context("getting wal_reader iter")?;
@@ -127,8 +128,6 @@ impl Engine {
             }
         }
         engine.wal.purge().context("purging wal")?;
-
-        let cache = Cache::new(400);
 
         Ok(engine)
     }
