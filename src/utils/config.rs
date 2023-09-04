@@ -92,7 +92,7 @@ impl TokenBucketConfig {
     pub fn default() -> Self {
         TokenBucketConfig {
             capacity: 5,
-            reset_interval: Duration::from_secs(2),
+            reset_interval: Duration::from_secs(10),
         }
     }
     pub fn get_values(&self) -> (usize, Duration) {

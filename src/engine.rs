@@ -1,6 +1,6 @@
 use crate::building_blocks::{
     BTree, Cache, Entry, LSMTree, LSMTreeInterface, Memtable, MemtableEntry, WriteAheadLog,
-    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch, SimHash, SkipList, MF, BINCODE_OPTIONS, similarity,
+    WriteAheadLogReader, SF, BloomFilter, HyperLogLog, CountMinSketch, SimHash, SkipList, TokenBucket, MF, BINCODE_OPTIONS, similarity,
 };
 use crate::building_blocks::FileOrganization::{SingleFile, MultiFile};
 use crate::repl::REPL;
@@ -19,6 +19,7 @@ pub struct Engine {
     wal: WriteAheadLog,
     lsm: Box<dyn LSMTreeInterface>,
     config: Config,
+    token_bucket: TokenBucket,
 }
 
 impl Engine {
@@ -66,6 +67,8 @@ impl Engine {
         let wal_vars = config.wal.get_values();
         let wal = WriteAheadLog::new(&wal_vars.0, wal_vars.1).context("creating WAL")?;
         let lsm_vars = config.lsm.get_values();
+        let token_bucket_vars = config.token_bucket.get_values();
+        let token_bucket = TokenBucket::new(token_bucket_vars.0, token_bucket_vars.1);
         let mut engine = match lsm_vars.0 {
             SingleFile(()) => {
                 let lsm = LSMTree::<SF>::new(lsm_vars.1, lsm_vars.2, lsm_vars.3.clone(), lsm_vars.4, lsm_vars.5);
@@ -75,6 +78,7 @@ impl Engine {
                     wal,
                     lsm: Box::new(lsm),
                     config,
+                    token_bucket
                 }
             },
             MultiFile(()) => {
@@ -85,6 +89,7 @@ impl Engine {
                     wal,
                     lsm: Box::new(lsm),
                     config,
+                    token_bucket
                 }
             }
         };
@@ -136,88 +141,93 @@ impl Engine {
         loop {
             let query = repl.get_query();
             if let Ok(query) = query {
-                match query.commands {
-                    Commands::Get { key } => {
-                        let vec_key = key.as_bytes().to_vec();
-                        self.get(vec_key).context("getting entry from lsm")?;
-                    }
-                    Commands::Put { key, value } => {
-                        self.put(key, Some(value.as_bytes().to_vec()))
-                            .context("putting {key} {value}")?;
-                    }
-                    Commands::Delete { key } => {
-                        self.delete(key.clone()).context("deleting {key}")?;
-                    }
-                    Commands::Bf(cmd) => self.bloomfilter(cmd)?,
-                    Commands::Hll(cmd) => self.hll(cmd)?,
-                    Commands::Cms(cmd) => self.cms(cmd)?,
-                    Commands::Sh(cmd) => self.simhash(cmd)?,
-                    Commands::Quit => {
-                        self.quit().context("quitting")?;
-                        break;
-                    }
+                if self.token_bucket.take(1) {
+                    match query.commands {
+                        Commands::Get { key } => {
+                            let vec_key = key.as_bytes().to_vec();
+                            self.get(vec_key).context("getting entry from lsm")?;
+                        }
+                        Commands::Put { key, value } => {
+                            self.put(key, Some(value.as_bytes().to_vec()))
+                                .context("putting {key} {value}")?;
+                        }
+                        Commands::Delete { key } => {
+                            self.delete(key.clone()).context("deleting {key}")?;
+                        }
+                        Commands::Bf(cmd) => self.bloomfilter(cmd)?,
+                        Commands::Hll(cmd) => self.hll(cmd)?,
+                        Commands::Cms(cmd) => self.cms(cmd)?,
+                        Commands::Sh(cmd) => self.simhash(cmd)?,
+                        Commands::Quit => {
+                            self.quit().context("quitting")?;
+                            break;
+                        }
 
-                    Commands::List { key_prefix, pagination } => {
-                        let mut mem_res = self.memtable.prefix_scan(key_prefix.clone())
-                            .iter()
-                            .map(|e| Entry::from(&*e.as_ref().borrow()))
-                            .collect::<Vec<_>>();
-                        let lsm_res = self.lsm.prefix_scan(&key_prefix).context("running prefix scan")?;
-                        mem_res.extend_from_slice(&lsm_res);
-                        if pagination.is_none() {
-                            for entry in mem_res {
-                                print_entry(&entry)?;
-                                println!();
-                            }
-                        } else {
-                            let pagination = pagination.unwrap();
-                            let mut page = pagination[0];
-                            if page == 0 {page = 1};
-                            let page_size = pagination[1];
-                            let iter = mem_res
+                        Commands::List { key_prefix, pagination } => {
+                            let mut mem_res = self.memtable.prefix_scan(key_prefix.clone())
                                 .iter()
-                                .step_by(page_size as usize)
-                                .skip((page-1) as usize);
-                            let mut counter = 0;
-                            for entry in iter {
-                                if counter == page_size { break; }
-                                print_entry(&entry)?;
-                                println!();
-                                counter += 1;
+                                .map(|e| Entry::from(&*e.as_ref().borrow()))
+                                .collect::<Vec<_>>();
+                            let lsm_res = self.lsm.prefix_scan(&key_prefix).context("running prefix scan")?;
+                            mem_res.extend_from_slice(&lsm_res);
+                            if pagination.is_none() {
+                                for entry in mem_res {
+                                    print_entry(&entry)?;
+                                    println!();
+                                }
+                            } else {
+                                let pagination = pagination.unwrap();
+                                let mut page = pagination[0];
+                                if page == 0 {page = 1};
+                                let page_size = pagination[1];
+                                let iter = mem_res
+                                    .iter()
+                                    .step_by(page_size as usize)
+                                    .skip((page-1) as usize);
+                                let mut counter = 0;
+                                for entry in iter {
+                                    if counter == page_size { break; }
+                                    print_entry(&entry)?;
+                                    println!();
+                                    counter += 1;
+                                }
+                            }
+                        }
+
+                        Commands::RangeScan { start_key, end_key, pagination } => {
+                            let mut mem_res = self.memtable.range_scan(start_key.clone(), end_key.clone())
+                                .iter()
+                                .map(|e| Entry::from(&*e.as_ref().borrow()))
+                                .collect::<Vec<_>>();
+                            let lsm_res = self.lsm.range_scan(&start_key, &end_key).context("running prefix scan")?;
+                            mem_res.extend_from_slice(&lsm_res);
+                            if pagination.is_none() {
+                                for entry in mem_res {
+                                    print_entry(&entry)?;
+                                    println!();
+                                }
+                            } else {
+                                let pagination = pagination.unwrap();
+                                let mut page = pagination[0];
+                                if page == 0 {page = 1};
+                                let page_size = pagination[1];
+                                let iter = mem_res
+                                    .iter()
+                                    .step_by(page_size as usize)
+                                    .skip((page-1) as usize);
+                                let mut counter = 0;
+                                for entry in iter {
+                                    if counter == page_size { break; }
+                                    print_entry(&entry)?;
+                                    println!();
+                                    counter += 1;
+                                }
                             }
                         }
                     }
-
-                    Commands::RangeScan { start_key, end_key, pagination } => {
-                        let mut mem_res = self.memtable.range_scan(start_key.clone(), end_key.clone())
-                            .iter()
-                            .map(|e| Entry::from(&*e.as_ref().borrow()))
-                            .collect::<Vec<_>>();
-                        let lsm_res = self.lsm.range_scan(&start_key, &end_key).context("running prefix scan")?;
-                        mem_res.extend_from_slice(&lsm_res);
-                        if pagination.is_none() {
-                            for entry in mem_res {
-                                print_entry(&entry)?;
-                                println!();
-                            }
-                        } else {
-                            let pagination = pagination.unwrap();
-                            let mut page = pagination[0];
-                            if page == 0 {page = 1};
-                            let page_size = pagination[1];
-                            let iter = mem_res
-                                .iter()
-                                .step_by(page_size as usize)
-                                .skip((page-1) as usize);
-                            let mut counter = 0;
-                            for entry in iter {
-                                if counter == page_size { break; }
-                                print_entry(&entry)?;
-                                println!();
-                                counter += 1;
-                            }
-                        }
-                    }
+                } else {
+                    let timestamp = chrono::Local::now();
+                    println!("{} => FAIL...[TOKEN BUCKET CONSTRAINT]", timestamp.format("%H:%M:%S")); 
                 }
             } else {
                 query.context("getting query")?;
