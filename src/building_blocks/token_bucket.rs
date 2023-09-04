@@ -19,9 +19,9 @@ impl TokenBucket {
     pub fn new(capacity: usize, reset_interval: Duration) -> Self {
         Self {
             capacity,
+            reset_interval,
             tokens: capacity,
             last_reset: Instant::now(),
-            reset_interval,
         }
     }
 
