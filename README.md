@@ -14,7 +14,7 @@ NoSQL write-heavy key-value database with support for Bloom Filter, HyperLogLog,
 
 ## CLI
 The database itself has a console line interface which supports operations:
-- **init** - crates a new instance of the database, which encompasses creating the required directories for db to work and the config file
+- **init** - creates a new instance of the database, which encompasses creating the required directories for db to work and the config file
 
 - **clear** - removes any database data except the config file, keeping the required directories
 
