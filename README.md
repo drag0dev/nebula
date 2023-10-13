@@ -83,7 +83,7 @@ When initializing the database a config file will be created at "./data/config.j
 with the default configuration. Any changes, if needed, should be done in that file.  
 [Default config and config explanation](CONFIG.md)
 
-# Installation
+## Installation
 installing via cargo:
 ```
 cargo install --path ./
