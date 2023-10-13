@@ -1,6 +1,6 @@
-# <p style="text-align:center; font-size: 30px; font-weight:bold;">Nebula</p>
+# <p align="center">Nebula</p>
 
-<p style="text-align:center;"> 
+<p align="center"> 
 NoSQL write-heavy key-value database with support for Bloom Filter, HyperLogLog, CountMinSketch and SimHash data structures.
 </p>
 
